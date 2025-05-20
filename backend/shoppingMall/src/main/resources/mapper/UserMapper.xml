@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.shoppingmall.mapper.UserMapper">
+    <!-- 结果映射 -->
+    <resultMap id="UserResultMap" type="org.example.shoppingmall.entity.User">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <result property="email" column="email"/>
+        <result property="phone" column="phone"/>
+        <result property="country" column="country"/>
+        <result property="nickname" column="nickname"/>
+        <result property="avatar" column="avatar"/>
+        <result property="gender" column="gender"/>
+        <result property="birthday" column="birthday"/>
+        <result property="enabled" column="enabled"/>
+        <result property="createdAt" column="created_at"/>
+        <collection property="roles" ofType="org.example.shoppingmall.entity.Role">
+            <id property="id" column="role_id"/>
+            <result property="name" column="role_name"/>
+        </collection>
+    </resultMap>
+    
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        u.id, u.username, u.password, u.email, u.phone, u.country, u.nickname, 
+        u.avatar, u.gender, u.birthday, u.enabled, u.created_at
+    </sql>
+    
+    <!-- 插入操作 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (
+            username, password, email, phone, country, nickname, 
+            avatar, gender, birthday, enabled, created_at
+        ) VALUES (
+            #{username}, #{password}, #{email}, #{phone}, #{country}, #{nickname},
+            #{avatar}, #{gender}, #{birthday}, #{enabled}, NOW()
+        )
+    </insert>
+    
+    <!-- 更新操作 -->
+    <update id="update">
+        UPDATE users
+        <set>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="country != null">country = #{country},</if>
+            <if test="avatar != null">avatar = #{avatar},</if>
+            <if test="gender != null">gender = #{gender},</if>
+            <if test="birthday != null">birthday = #{birthday},</if>
+            <if test="password != null">password = #{password},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 删除操作 -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM users WHERE id = #{id}
+    </delete>
+    
+    <!-- 根据ID查询 -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM users u
+        WHERE u.id = #{id}
+    </select>
+    
+    <!-- 查询所有 -->
+    <select id="selectAll" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM users u
+        ORDER BY u.id
+    </select>
+    
+    <!-- 分页查询 -->
+    <select id="selectByPage" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM users u
+        ORDER BY u.id
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 按用户名查询 -->
+    <select id="findByUsername" resultMap="UserResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>,
+            r.id as role_id,
+            r.name as role_name
+        FROM users u
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id
+        WHERE u.username = #{username}
+    </select>
+    
+    <!-- 按邮箱查询 -->
+    <select id="findByEmail" resultMap="UserResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>,
+            r.id as role_id,
+            r.name as role_name
+        FROM users u
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id
+        WHERE u.email = #{email}
+    </select>
+    
+    <!-- 按手机号查询 -->
+    <select id="selectByPhone" parameterType="java.lang.String" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM users u
+        WHERE u.phone = #{phone}
+    </select>
+    
+    <!-- 按角色查询 -->
+    <select id="selectByRole" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM users u
+        WHERE u.country = #{country}
+        ORDER BY u.id
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 计数 -->
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM users
+    </select>
+    
+    <!-- 更新最后登录时间 -->
+    <update id="updateLastLoginTime">
+        UPDATE users
+        SET last_login_time = #{lastLoginTime},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="existsByUsername" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM users WHERE username = #{username})
+    </select>
+
+    <select id="existsByEmail" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM users WHERE email = #{email})
+    </select>
+</mapper> 

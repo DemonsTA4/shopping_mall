@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.shoppingmall.mapper.AddressMapper">
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.example.shoppingmall.entity.Address">
+        <id column="id" property="id" />
+        <result column="receiver_name" property="receiverName" />
+        <result column="phone" property="phone" />
+        <result column="province" property="province" />
+        <result column="city" property="city" />
+        <result column="district" property="district" />
+        <result column="detail_address" property="detailAddress" />
+        <result column="zip_code" property="zipCode" />
+        <result column="is_default" property="isDefault" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+        <association property="user" javaType="org.example.shoppingmall.entity.User">
+            <id column="user_id" property="id" />
+            <result column="username" property="username" />
+        </association>
+    </resultMap>
+    
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        a.id, a.receiver_name, a.phone, a.province, a.city, a.district, 
+        a.detail_address, a.zip_code, a.is_default, a.created_at, a.updated_at, 
+        a.user_id, u.username
+    </sql>
+    
+    <!-- 插入操作 -->
+    <insert id="insert" parameterType="org.example.shoppingmall.entity.Address" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO addresses (
+            user_id, receiver_name, phone, province, city, district, 
+            detail_address, zip_code, is_default, created_at, updated_at
+        ) VALUES (
+            #{user.id}, #{receiverName}, #{phone}, #{province}, #{city}, #{district}, 
+            #{detailAddress}, #{zipCode}, #{isDefault}, NOW(), NOW()
+        )
+    </insert>
+    
+    <!-- 更新操作 -->
+    <update id="update" parameterType="org.example.shoppingmall.entity.Address">
+        UPDATE addresses
+        <set>
+            <if test="receiverName != null">receiver_name = #{receiverName},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="province != null">province = #{province},</if>
+            <if test="city != null">city = #{city},</if>
+            <if test="district != null">district = #{district},</if>
+            <if test="detailAddress != null">detail_address = #{detailAddress},</if>
+            <if test="zipCode != null">zip_code = #{zipCode},</if>
+            <if test="isDefault != null">is_default = #{isDefault},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 删除操作 -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM addresses WHERE id = #{id}
+    </delete>
+    
+    <!-- 根据ID查询 -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM addresses a
+        LEFT JOIN users u ON a.user_id = u.id
+        WHERE a.id = #{id}
+    </select>
+    
+    <!-- 查询所有 -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM addresses a
+        LEFT JOIN users u ON a.user_id = u.id
+        ORDER BY a.id
+    </select>
+    
+    <!-- 根据用户ID查询地址 -->
+    <select id="selectByUserId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM addresses a
+        LEFT JOIN users u ON a.user_id = u.id
+        WHERE a.user_id = #{userId}
+        ORDER BY a.is_default DESC, a.id DESC
+    </select>
+    
+    <!-- 根据用户ID查询默认地址 -->
+    <select id="selectDefaultByUserId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM addresses a
+        LEFT JOIN users u ON a.user_id = u.id
+        WHERE a.user_id = #{userId} AND a.is_default = 1
+        LIMIT 1
+    </select>
+    
+    <!-- 取消该用户所有地址的默认状态 -->
+    <update id="updateResetDefaultByUserId" parameterType="java.lang.Integer">
+        UPDATE addresses SET is_default = 0, updated_at = NOW()
+        WHERE user_id = #{userId}
+    </update>
+    
+    <!-- 设置地址为默认 -->
+    <update id="updateSetDefault">
+        UPDATE addresses SET is_default = 1, updated_at = NOW()
+        WHERE id = #{addressId} AND user_id = #{userId}
+    </update>
+    
+    <!-- 检查地址是否属于指定用户 -->
+    <select id="countByIdAndUserId" resultType="int">
+        SELECT COUNT(*) FROM addresses
+        WHERE id = #{id} AND user_id = #{userId}
+    </select>
+</mapper> 

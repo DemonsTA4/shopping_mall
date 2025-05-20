@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.shoppingmall.mapper.CommentMapper">
+    <resultMap id="CommentMap" type="org.example.shoppingmall.entity.Comment">
+        <id property="id" column="id"/>
+        <result property="content" column="content"/>
+        <result property="rating" column="rating"/>
+        <result property="images" column="images"/>
+        <result property="createTime" column="create_time"/>
+        <association property="user" javaType="org.example.shoppingmall.entity.User">
+            <id property="id" column="user_id"/>
+            <result property="username" column="username"/>
+            <result property="nickname" column="nickname"/>
+            <result property="avatar" column="avatar"/>
+        </association>
+        <association property="product" javaType="org.example.shoppingmall.entity.Product">
+            <id property="id" column="product_id"/>
+            <result property="name" column="product_name"/>
+            <result property="image" column="product_image"/>
+        </association>
+        <association property="orderItem" javaType="org.example.shoppingmall.entity.OrderItem">
+            <id property="id" column="order_item_id"/>
+        </association>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        c.id, c.content, c.rating, c.images, c.create_time,
+        u.id as user_id, u.username, u.nickname, u.avatar,
+        p.id as product_id, p.name as product_name, p.image as product_image,
+        oi.id as order_item_id
+    </sql>
+
+    <insert id="insert" parameterType="org.example.shoppingmall.entity.Comment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO comments (user_id, product_id, order_item_id, content, rating, images, create_time)
+        VALUES (#{user.id}, #{product.id}, #{orderItem.id}, #{content}, #{rating}, #{images}, #{createTime})
+    </insert>
+
+    <update id="update" parameterType="org.example.shoppingmall.entity.Comment">
+        UPDATE comments
+        SET content = #{content},
+            rating = #{rating},
+            images = #{images}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM comments WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" resultMap="CommentMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        LEFT JOIN products p ON c.product_id = p.id
+        LEFT JOIN order_items oi ON c.order_item_id = oi.id
+        WHERE c.id = #{id}
+    </select>
+
+    <select id="selectByProductId" resultMap="CommentMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        LEFT JOIN products p ON c.product_id = p.id
+        LEFT JOIN order_items oi ON c.order_item_id = oi.id
+        WHERE c.product_id = #{productId}
+        ORDER BY c.create_time DESC
+    </select>
+
+    <select id="selectByUserId" resultMap="CommentMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        LEFT JOIN products p ON c.product_id = p.id
+        LEFT JOIN order_items oi ON c.order_item_id = oi.id
+        WHERE c.user_id = #{userId}
+        ORDER BY c.create_time DESC
+    </select>
+
+    <select id="getAverageRatingByProductId" resultType="java.lang.Double">
+        SELECT AVG(rating)
+        FROM comments
+        WHERE product_id = #{productId}
+    </select>
+</mapper> 

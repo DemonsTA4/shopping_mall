@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.shoppingmall.mapper.ProductMapper">
+    <resultMap id="ProductResultMap" type="org.example.shoppingmall.entity.Product">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="categoryId" column="category_id"/> <result property="description" column="description"/>
+        <result property="price" column="price"/>
+        <result property="originalPrice" column="original_price"/>
+        <result property="stock" column="stock"/>
+        <result property="status" column="status"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="images" column="images"/>
+        <result property="detail" column="detail"/>
+        <result property="params" column="params"/>
+        <result property="specs" column="specs"/>
+        <result property="sales" column="sales"/>
+        <result property="createTime" column="created_at"/>
+        <result property="updateTime" column="updated_at"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, name, category_id, description, price, original_price, stock, status,
+        image_url, images, detail, params, specs, sales, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="org.example.shoppingmall.entity.Product" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO products (
+            name, category_id, description, price, original_price, stock, status,
+            image_url, images, detail, params, specs, sales,
+            created_at, updated_at
+        ) VALUES (
+                     #{name}, #{categoryId}, #{description}, #{price}, #{originalPrice}, #{stock}, #{status},
+                     #{imageUrl}, #{images}, #{detail}, #{params}, #{specs}, 0, NOW(), NOW()
+                 )
+    </insert>
+
+    <update id="update" parameterType="org.example.shoppingmall.entity.Product">
+        UPDATE products
+        <set>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="originalPrice != null">original_price = #{originalPrice},</if>
+            <if test="stock != null">stock = #{stock},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="images != null">images = #{images},</if>
+            <if test="detail != null">detail = #{detail},</if>
+            <if test="params != null">params = #{params},</if>
+            <if test="specs != null">specs = #{specs},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Long"> DELETE FROM products WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" parameterType="java.lang.Long" resultMap="ProductResultMap"> SELECT <include refid="Base_Column_List"/>
+        FROM products
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByPage" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM products
+    </select>
+
+    <select id="selectBySellerId" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        WHERE seller_id = #{sellerId} ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="selectByIdAndSellerId" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        WHERE id = #{id} AND seller_id = #{sellerId} </select>
+
+    <select id="selectByIsActiveTrue" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        WHERE status = 1
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="selectByNameContaining" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        WHERE name LIKE CONCAT('%', #{name}, '%') AND status = 1
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="selectByCategoryId" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        WHERE category_id = #{categoryId} AND status = 1
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="advancedSearch" parameterType="org.example.shoppingmall.dto.ProductSearchDto" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                name LIKE CONCAT('%', #{keyword}, '%')
+                OR description LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="categoryId != null">
+                AND category_id = #{categoryId}
+            </if>
+            <if test="minPrice != null">
+                AND price &gt;= #{minPrice} </if>
+            <if test="maxPrice != null">
+                AND price &lt;= #{maxPrice} </if>
+            AND status = 1 </where>
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="selectByIsActiveTrueOrderByCreatedAtDesc" resultMap="ProductResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM products
+        WHERE status = 1 ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="search" parameterType="map" resultMap="ProductResultMap"> SELECT <include refid="Base_Column_List"/>
+        FROM products
+        <where>
+            <if test="search.keyword != null and search.keyword != ''">
+                AND (
+                name LIKE CONCAT('%', #{search.keyword}, '%')
+                OR description LIKE CONCAT('%', #{search.keyword}, '%')
+                )
+            </if>
+            <if test="search.categoryId != null">
+                AND category_id = #{search.categoryId}
+            </if>
+            <if test="search.minPrice != null">
+                AND price &gt;= #{search.minPrice}
+            </if>
+            <if test="search.maxPrice != null">
+                AND price &lt;= #{search.maxPrice}
+            </if>
+            AND status = 1 </where>
+        <choose>
+            <when test="orderBy == 'price' and orderDirection == 'asc'">
+                ORDER BY price ASC
+            </when>
+            <when test="orderBy == 'price' and orderDirection == 'desc'">
+                ORDER BY price DESC
+            </when>
+            <when test="orderBy == 'sales' and orderDirection == 'asc'">
+                ORDER BY sales ASC
+            </when>
+            <when test="orderBy == 'sales' and orderDirection == 'desc'">
+                ORDER BY sales DESC
+            </when>
+            <otherwise>
+                ORDER BY created_at DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countSearch" parameterType="org.example.shoppingmall.dto.ProductSearchDto" resultType="int">
+        SELECT COUNT(*)
+        FROM products
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                name LIKE CONCAT('%', #{keyword}, '%')
+                OR description LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="categoryId != null">
+                AND category_id = #{categoryId}
+            </if>
+            <if test="minPrice != null">
+                AND price &gt;= #{minPrice}
+            </if>
+            <if test="maxPrice != null">
+                AND price &lt;= #{maxPrice}
+            </if>
+            AND status = 1 </where>
+    </select>
+
+    <update id="updateStock">
+        UPDATE products
+        SET stock = #{stock},
+            updated_at = NOW()
+        WHERE id = #{id} </update>
+
+    <update id="updateSales">
+        UPDATE products
+        SET sales = sales + #{increment}, updated_at = NOW()
+        WHERE id = #{id} </update>
+</mapper>

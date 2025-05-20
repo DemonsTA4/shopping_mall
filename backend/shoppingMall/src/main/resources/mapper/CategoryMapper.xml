@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.shoppingmall.mapper.CategoryMapper">
+
+    <resultMap id="BaseResultMap" type="org.example.shoppingmall.entity.Category">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="icon" property="icon" jdbcType="VARCHAR"/>
+        <result column="sort" property="sort" jdbcType="INTEGER"/>
+        <result column="status" property="status" jdbcType="TINYINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, name, description, icon, sort, status, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="org.example.shoppingmall.entity.Category" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO categories (
+            name, description, icon, sort, status, create_time, update_time
+        ) VALUES (
+                     #{name, jdbcType=VARCHAR},
+                     #{description, jdbcType=VARCHAR},
+                     #{icon, jdbcType=VARCHAR},
+                     #{sort, jdbcType=INTEGER},
+                     #{status, jdbcType=TINYINT},
+                     NOW(),
+                     NOW()
+                 )
+    </insert>
+
+    <update id="update" parameterType="org.example.shoppingmall.entity.Category">
+        UPDATE categories
+        <set>
+            <if test="name != null and name != ''">name = #{name, jdbcType=VARCHAR},</if>
+            <if test="description != null">description = #{description, jdbcType=VARCHAR},</if>
+            <if test="icon != null">icon = #{icon, jdbcType=VARCHAR},</if>
+            <if test="sort != null">sort = #{sort, jdbcType=INTEGER},</if>
+            <if test="status != null">status = #{status, jdbcType=TINYINT},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id, jdbcType=BIGINT}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM categories WHERE id = #{id, jdbcType=BIGINT}
+    </delete>
+
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM categories WHERE id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id, jdbcType=BIGINT}
+        </foreach>
+    </delete>
+
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM categories
+        WHERE id = #{id, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectByName" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM categories
+        WHERE name = #{name, jdbcType=VARCHAR}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM categories
+        ORDER BY sort ASC, id ASC
+    </select>
+
+    <select id="selectByPage" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM categories
+        ORDER BY sort ASC, id ASC
+        LIMIT #{offset, jdbcType=INTEGER}, #{limit, jdbcType=INTEGER}
+    </select>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM categories
+    </select>
+
+    <select id="searchCategories" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM categories
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword, jdbcType=VARCHAR}, '%')
+                OR description LIKE CONCAT('%', #{keyword, jdbcType=VARCHAR}, '%'))
+            </if>
+            <if test="status != null">
+                AND status = #{status, jdbcType=TINYINT}
+            </if>
+        </where>
+        ORDER BY sort ASC, id ASC
+        <if test="offset != null and limit != null">
+            LIMIT #{offset, jdbcType=INTEGER}, #{limit, jdbcType=INTEGER}
+        </if>
+    </select>
+
+    <select id="countSearchCategories" resultType="int">
+        SELECT COUNT(*)
+        FROM categories
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword, jdbcType=VARCHAR}, '%')
+                OR description LIKE CONCAT('%', #{keyword, jdbcType=VARCHAR}, '%'))
+            </if>
+            <if test="status != null">
+                AND status = #{status, jdbcType=TINYINT}
+            </if>
+        </where>
+    </select>
+
+</mapper>

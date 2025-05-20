@@ -1,0 +1,110 @@
+@import './variables.scss';
+
+// 重置样式
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: $font-size-base;
+  color: $text-regular;
+  background-color: $bg-color;
+}
+
+a {
+  text-decoration: none;
+  color: $primary-color;
+  transition: color 0.3s;
+  
+  &:hover {
+    color: lighten($primary-color, 10%);
+  }
+}
+
+// 通用样式
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: $spacing-base;
+}
+
+.page-title {
+  font-size: $font-size-extra-large;
+  margin-bottom: $spacing-large;
+  padding-bottom: $spacing-small;
+  border-bottom: 1px solid $border-lighter;
+  color: $text-primary;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.flex-center {
+  @include flex-center;
+}
+
+.flex-between {
+  @include flex-between;
+}
+
+.m-t {
+  margin-top: $spacing-base;
+}
+
+.m-b {
+  margin-bottom: $spacing-base;
+}
+
+.m-l {
+  margin-left: $spacing-base;
+}
+
+.m-r {
+  margin-right: $spacing-base;
+}
+
+.p-t {
+  padding-top: $spacing-base;
+}
+
+.p-b {
+  padding-bottom: $spacing-base;
+}
+
+.p-l {
+  padding-left: $spacing-base;
+}
+
+.p-r {
+  padding-right: $spacing-base;
+}
+
+// 卡片样式
+.card {
+  background-color: #fff;
+  border-radius: $border-radius-base;
+  padding: $spacing-large;
+  box-shadow: $box-shadow-light;
+  margin-bottom: $spacing-base;
+}
+
+// 响应式
+@include respond-to(sm) {
+  .container {
+    padding: $spacing-small;
+  }
+} 

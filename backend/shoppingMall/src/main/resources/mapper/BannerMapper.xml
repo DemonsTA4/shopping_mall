@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.shoppingmall.mapper.BannerMapper">
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.example.shoppingmall.entity.Banner">
+        <id column="id" property="id" />
+        <result column="title" property="title" />
+        <result column="image_url" property="imageUrl" />
+        <result column="link_url" property="linkUrl" />
+        <result column="sort_order" property="sortOrder" />
+        <result column="is_active" property="isActive" />
+        <result column="position" property="position" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+    
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, title, image_url, link_url, sort_order, is_active, position, created_at, updated_at
+    </sql>
+    
+    <!-- 插入操作 -->
+    <insert id="insert" parameterType="org.example.shoppingmall.entity.Banner" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO banners (
+            title, image_url, link_url, sort_order, is_active, position, created_at, updated_at
+        ) VALUES (
+            #{title}, #{imageUrl}, #{linkUrl}, #{sortOrder}, #{isActive}, #{position}, NOW(), NOW()
+        )
+    </insert>
+    
+    <!-- 更新操作 -->
+    <update id="update" parameterType="org.example.shoppingmall.entity.Banner">
+        UPDATE banners
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="linkUrl != null">link_url = #{linkUrl},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="isActive != null">is_active = #{isActive},</if>
+            <if test="position != null">position = #{position},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 删除操作 -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM banners WHERE id = #{id}
+    </delete>
+    
+    <!-- 根据ID查询 -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM banners
+        WHERE id = #{id}
+    </select>
+    
+    <!-- 查询所有 -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM banners
+        ORDER BY sort_order ASC, id ASC
+    </select>
+    
+    <!-- 查询激活状态的Banner -->
+    <select id="selectByIsActiveTrue" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM banners
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    </select>
+    
+    <!-- 根据位置查询激活的Banner -->
+    <select id="selectByPositionAndIsActiveTrue" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM banners
+        WHERE is_active = 1 AND position = #{position}
+        ORDER BY sort_order ASC, id ASC
+    </select>
+    
+    <!-- 根据排序查询Banner -->
+    <select id="selectByIsActiveTrueOrderBySortOrder" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM banners
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    </select>
+    
+    <!-- 更新Banner状态 -->
+    <update id="updateStatus">
+        UPDATE banners
+        SET is_active = #{isActive}, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper> 
