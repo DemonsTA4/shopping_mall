@@ -26,7 +26,7 @@ public class OrderResponseDto {
 
     private Integer payType;
 
-    private OrderStatus status;
+    private Integer status;
 
     private String deliveryCompany;
 

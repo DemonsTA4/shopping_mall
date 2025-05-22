@@ -109,7 +109,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { getOrderDetail } from '@/api/order';
+import { getOrderDetailByIdApi } from '@/api/order';
 import { addComment } from '@/api/product';
 
 const route = useRoute();
@@ -138,7 +138,7 @@ const fetchOrderDetail = async () => {
   loading.value = true;
   
   try {
-    const res = await getOrderDetail(orderId);
+    const res = await getOrderDetailByIdApi(orderId);
     order.value = res.data || {};
     
     // 初始化评论表单

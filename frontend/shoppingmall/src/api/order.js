@@ -33,28 +33,38 @@ export function getOrders(params) {
 }
 
 /**
- * 获取订单详情
- * @param {number} id - 订单ID
- * @returns {Promise} 请求的Promise对象
+ * 根据数字主键ID获取订单详情
+ * @param {number | string} id - 订单的数字主键ID
  */
-export function getOrderDetail(id) {
+export function getOrderDetailByIdApi(id) { // 函数名区分
   return request({
-    url: `/orders/${id}`,
+    url: `/orders/id/${id}`, // 调用后端 /api/orders/id/{id} 接口
+    method: 'get'
+  });
+}
+
+/**
+ * 根据字符串订单号获取订单详情
+ * @param {string} orderNo - 订单的字符串编号
+ */
+export function getOrderDetailByOrderNoApi(orderNo) { // 函数名区分
+  return request({
+    url: `/orders/${orderNo}`, // 调用后端 /api/orders/{orderNo} 接口
     method: 'get'
   });
 }
 
 /**
  * 取消订单
- * @param {number} id - 订单ID
+ * @param {number} orderNo - 订单ID
  * @param {Object} data - 取消原因
  * @param {string} data.reason - 取消原因
  * @returns {Promise} 请求的Promise对象
  */
-export function cancelOrder(id, data) {
+export function cancelOrder(orderNo, data) {
   return request({
-    url: `/orders/${id}/cancel`,
-    method: 'put',
+    url: `/orders/${orderNo}/cancel`,
+    method: 'post',
     data
   });
 }
@@ -67,7 +77,7 @@ export function cancelOrder(id, data) {
 export function confirmReceipt(id) {
   return request({
     url: `/orders/${id}/confirm`,
-    method: 'put'
+    method: 'post'
   });
 }
 
@@ -99,4 +109,35 @@ export function applyRefund(id, data) {
   });
 }
 
-/** * 支付订单 * @param {number} id - 订单ID * @param {Object} data - 支付数据 * @param {string} data.paymentMethod - 支付方式 * @returns {Promise} 请求的Promise对象 */export function payOrder(id, data) {  return request({    url: `/orders/${id}/pay`,    method: 'post',    data  });} /** * 获取订单物流信息 * @param {number} id - 订单ID * @returns {Promise} 请求的Promise对象 */export function getOrderLogistics(id) {  return request({    url: `/orders/${id}/logistics`,    method: 'get'  });} 
+/** 
+* 支付订单 
+* * @param {number} id - 订单ID 
+* * @param {Object} data - 支付数据 
+* * @param {string} data.paymentMethod - 支付方式 
+* * @returns {Promise} 请求的Promise对象 
+* */
+export function payOrder(id, data) {
+	return request({    
+		url: `/orders/${id}/pay`,    
+		method: 'post',    
+		data  ,
+	});
+} 
+/** 
+* 获取订单物流信息 
+* * @param {number} id - 订单ID 
+* * @returns {Promise} 请求的Promise对象 
+* */
+export function getOrderLogistics(id) {
+	return request({    
+		url: `/orders/${id}/logistics`,    
+		method: 'get'  ,
+	});
+} 
+
+export function getPaymentStatus(orderId) { // 接收 orderId (Long)
+  return request({
+    url: `/payments/status/${orderId}`, // 假设这是查询支付状态的API端点
+    method: 'get'
+  });
+}

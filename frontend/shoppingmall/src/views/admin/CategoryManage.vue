@@ -16,11 +16,13 @@
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column label="分类图标" width="100">
         <template #default="{ row }">
+			{{ console.log('当前行分类名称 (row.name):', row.name, '类型:', typeof row.name) }}
+			    {{ console.log('尝试获取图标 for ' + row.name + ':', getCategoryIcon(row.name)) }}
           <el-image
-            v-if="row.icon"
-            :src="row.icon"
+            v-if="getCategoryIcon(row.name)" :src="getCategoryIcon(row.name)"
             fit="contain"
             class="category-icon"
+            :alt="row.name"
           />
           <el-icon v-else><Picture /></el-icon>
         </template>
@@ -38,7 +40,12 @@
           />
         </template>
       </el-table-column>
-      <el-table-column prop="createTime" label="创建时间" width="180" />
+      <el-table-column prop="createTime" label="创建时间" width="180">
+        <template #default="{ row }">
+          <span>{{ $formatTime(row.createTime) }}</span>
+          </template>
+      </el-table-column>
+      
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button type="primary" link @click="handleEdit(row)">
@@ -49,7 +56,6 @@
           </el-button>
         </template>
       </el-table-column>
-    </el-table>
 
     <!-- 添加/编辑分类对话框 -->
     <el-dialog
@@ -130,6 +136,21 @@ import {
   updateCategoryStatus,
   uploadCategoryIcon
 } from '@/api/category';
+import foodIcon from '@/assets/images/food.png';
+import computerIcon from '@/assets/images/computer.png';
+import clothingIcon from '@/assets/images/clothing.png';
+import earphoneIcon from '@/assets/images/earphone.png';
+import phoneIcon from '@/assets/images/phone.png';
+
+const categoryIconMap = {
+  '电子产品': earphoneIcon, // 您指定 earphoneIcon 代表电子产品
+  '服装': clothingIcon,
+  '食品': foodIcon,
+  '手机': phoneIcon,
+  '电脑': computerIcon,
+  // 您可以添加更多的分类和对应的图标
+  // 例如，如果后端返回的分类名和文件名有一定规律，也可以动态构造
+};
 
 // 列表数据
 const loading = ref(false);
@@ -146,7 +167,6 @@ const form = reactive({
   name: '',
   description: '',
   sort: 0,
-  icon: '',
   status: 1
 });
 
@@ -161,9 +181,6 @@ const rules = {
   ],
   sort: [
     { required: true, message: '请输入排序值', trigger: 'blur' }
-  ],
-  icon: [
-    { required: true, message: '请上传分类图标', trigger: 'change' }
   ]
 };
 
@@ -228,7 +245,6 @@ const resetForm = () => {
     name: '',
     description: '',
     sort: 0,
-    icon: '',
     status: 1
   });
 };
@@ -261,21 +277,6 @@ const handleSubmit = async () => {
   }
 };
 
-// 上传图标
-const uploadIcon = async (options) => {
-  try {
-    const file = options.file;
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const res = await uploadCategoryIcon(formData);
-    form.icon = res.data.url;
-    ElMessage.success('上传成功');
-  } catch (error) {
-    console.error('上传图标失败:', error);
-    ElMessage.error('上传失败，请重试');
-  }
-};
 
 // 处理状态变更
 const handleStatusChange = async (row) => {
@@ -289,6 +290,10 @@ const handleStatusChange = async (row) => {
     row.status = row.status === 1 ? 0 : 1;
   }
 };
+
+function getCategoryIcon(categoryName) {
+  return categoryIconMap[categoryName] || defaultCategoryIcon;
+}
 
 onMounted(() => {
   fetchCategories();

@@ -5,6 +5,12 @@ import { useUserStore } from './store/modules/user';
 import { useCartStore } from './store/modules/cart';
 import { useI18n } from 'vue-i18n';
 import { ShoppingCart } from '@element-plus/icons-vue';
+import foodIcon from '@/assets/images/food.png';
+import computerIcon from '@/assets/images/computer.png';
+import clothingIcon from '@/assets/images/clothing.png';
+import earphoneIcon from '@/assets/images/earphone.png'; // 电子产品
+import phoneIcon from '@/assets/images/phone.png';
+import defaultCategoryIcon from '@/assets/images/default-category.png'; // 确保有默认图标
 //import { getCartItemCount } from '@/api/cart';
 
 const router = useRouter();
@@ -12,7 +18,7 @@ const route = useRoute();
 const userStore = useUserStore();
 const cartStore = useCartStore();
 const { t } = useI18n();
-//const error = ref(null);
+const error = ref(null);
 
 onMounted(async () => {
   console.log('App.vue onMounted: 开始初始化用户认证状态...');
@@ -34,6 +40,22 @@ const showHeaderFooter = computed(() => {
 });
 
 const cartBadgeCount = computed(() => cartStore.totalItems);
+
+const categoryIconMap = {
+  '电子产品': earphoneIcon,
+  '服装': clothingIcon,
+  '食品': foodIcon,
+  '手机': phoneIcon,
+  '电脑': computerIcon,
+  // 确保键名与您首页获取到的分类数据的名称字段完全匹配
+};
+
+function getCategoryIcon(categoryName) { // 或者接收整个 category 对象
+  // console.log('首页尝试获取图标，分类名:', categoryName); // 添加调试日志
+  const icon = categoryIconMap[categoryName];
+  // console.log('映射到的图标路径:', icon); // 添加调试日志
+  return icon || defaultCategoryIcon;
+}
 
 // 购物车商品数量
 const cartItemCount = ref(0);
@@ -102,10 +124,8 @@ onMounted(async () => {
 // 捕获子组件中的错误
 onErrorCaptured((err, instance, info) => {
   console.error('应用错误:', err, info);
-  error.value = err;
-  // 跳转到错误页面
-  router.push('/error');
-  // 阻止错误继续传播
+  error.value = err; // 现在这行代码可以正常工作了
+  router.push('/error'); // 确保 router 实例已正确获取和使用
   return false;
 });
 </script>

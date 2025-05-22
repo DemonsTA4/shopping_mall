@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AddressDto {
 
-    private Integer id; // 地址ID (在创建时通常为空，由后端生成)
+    private Long id; // 地址ID (在创建时通常为空，由后端生成)
 
     // userId 通常在创建/更新时从路径参数或认证信息获取，
     // 但在返回DTO列表时可能需要，这里暂时不包含，因为Service方法签名中userId是独立参数

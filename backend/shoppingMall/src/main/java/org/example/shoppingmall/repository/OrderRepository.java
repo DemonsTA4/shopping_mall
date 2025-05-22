@@ -26,15 +26,29 @@ public interface OrderRepository extends JpaRepository<Order, Long> { // 主键�
     @EntityGraph(attributePaths = {"buyer", "items", "items.product"})
     Page<Order> findByBuyerIdOrderByCreatedAtDesc(Long buyerId, Pageable pageable); // 推荐的按用户分页查询方法
 
+    /**
+     * 根据购买者ID和订单状态查询订单（分页）
+     * @param buyerId 购买者用户ID
+     * @param status 订单状态 (OrderStatus 枚举类型)
+     * @param pageable 分页和排序信息
+     * @return 订单的分页结果
+     */
+    @EntityGraph(attributePaths = {"buyer", "items", "items.product"}) // 建议添加，以便在列表页急切加载必要信息，避免N+1
+    Page<Order> findByBuyerIdAndStatus(Long buyerId, OrderStatus status, Pageable pageable);
+
     // 用于 serviceImpl 中的 getUserOrdersWithDetails，但上面一个更通用
     @Query("SELECT o FROM Order o JOIN FETCH o.buyer b WHERE b.id = :buyerId") // 确保是 buyer.id
     @EntityGraph(attributePaths = {"items", "items.product"}) // user 已经在JOIN FETCH中了
     Page<Order> findByBuyerIdWithDetails(@Param("buyerId") Long buyerId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"buyer", "items", "items.product"})
     Optional<Order> findByOrderNo(String orderNo);
 
     @EntityGraph(attributePaths = {"buyer", "items", "items.product"}) // buyer 也需要关联，确保Order实体有buyer字段
     Optional<Order> findByIdAndBuyerId(Long id, Long buyerId); // 确保是 buyer.id
+
+    @EntityGraph(attributePaths = {"buyer", "items", "items.product"}) // buyer 也需要关联，确保Order实体有buyer字段
+    Optional<Order> findByOrderNoAndBuyerId(String orderNo, Long buyerId); // 确保是 buyer.id
 
     // 使用 OrderStatus 枚举类型作为参数
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime time); // 注意方法名和参数类型

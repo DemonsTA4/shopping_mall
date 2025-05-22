@@ -43,16 +43,16 @@
               @click="goToProductDetail(item.productId)"
             >
               <el-image 
-                :src="item.imageUrl" 
-                :alt="item.name"
+                :src="item.productImage" 
+                :alt="item.productName"
                 class="product-image"
               />
               <div class="product-info">
-                <div class="product-name">{{ item.name }}</div>
-                <div class="product-price">
-                  <span class="price">¥{{ item.price }}</span>
+                <div class="product-name">{{ item.productName }}</div>
+                
+                  <span class="producyPrice">¥{{ item.productPrice }}</span>
                   <span class="quantity">x {{ item.quantity }}</span>
-                </div>
+                
               </div>
             </div>
           </div>
@@ -307,7 +307,13 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/store/modules/user';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getOrders, cancelOrder as cancelOrderApi, confirmReceipt as confirmReceiptApi, deleteOrder as deleteOrderApi, applyRefund as applyRefundApi } from '@/api/order';
+import { getOrders,
+ cancelOrder as cancelOrderApi, 
+ confirmReceipt as confirmReceiptApi, 
+ deleteOrder as deleteOrderApi, 
+ applyRefund as applyRefundApi ,
+ getOrderLogistics
+ } from '@/api/order';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -347,6 +353,8 @@ const refundDialog = reactive({
 // 物流信息对话框
 const logisticsDialog = reactive({
   visible: false,
+  orderIdForLogistics: null, // 用于存储当前查看物流的订单ID
+  loading: false, // 物流加载状态
   data: {
     company: '',
     trackingNo: '',
@@ -356,74 +364,56 @@ const logisticsDialog = reactive({
 
 // 获取订单列表
 const fetchOrderList = async () => {
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录');
-    router.push('/login');
-    return;
-  }
-  
   loading.value = true;
-  
   try {
-    const res = await getOrders(queryParams);
-    orderList.value = res.data.list || [];
-    total.value = res.data.total || 0;
+      console.log('发起请求，使用的queryParams:', JSON.parse(JSON.stringify(queryParams))); // 确认参数
+      const res = await getOrders(queryParams);
+      if (res && res.data) {
+        orderList.value = res.data.content || [];
+        total.value = res.data.totalElements || 0;
+      }  else {
+        orderList.value = [];
+        total.value = 0;
+        // totalPages.value = 0;
+        ElMessage.error('获取订单数据格式有误');
+    }
   } catch (error) {
     console.error('获取订单列表失败:', error);
-    ElMessage.error('获取订单列表失败，请重试');
-    
-    // 使用模拟数据
-    mockOrderList();
+    ElMessage.error(error.message || '获取订单列表失败，请重试');
+    orderList.value = []; // 清空列表或显示错误提示
+    total.value = 0;
+    // 不再调用 mockOrderList()
   } finally {
     loading.value = false;
   }
 };
 
-// 模拟订单数据
-const mockOrderList = () => {
-  const list = [];
-  const status = parseInt(activeStatus.value);
-  
-  for (let i = 1; i <= queryParams.pageSize; i++) {
-    // 如果选择了特定状态，只显示该状态的订单
-    const orderStatus = status === 0 ? (i % 6) + 1 : status;
-    
-    list.push({
-      id: i,
-      orderNo: `ORDER${Date.now()}${i}`,
-      status: orderStatus,
-      totalAmount: (Math.random() * 1000 + 100).toFixed(2),
-      createTime: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-      items: [
-        {
-          id: i * 100 + 1,
-          productId: i * 10 + 1,
-          name: `测试商品 ${i * 10 + 1}`,
-          price: (Math.random() * 100 + 50).toFixed(2),
-          quantity: Math.floor(Math.random() * 3) + 1,
-          imageUrl: `https://picsum.photos/id/${i * 10 + 1}/100/100`
-        },
-        {
-          id: i * 100 + 2,
-          productId: i * 10 + 2,
-          name: `测试商品 ${i * 10 + 2}`,
-          price: (Math.random() * 200 + 100).toFixed(2),
-          quantity: Math.floor(Math.random() * 2) + 1,
-          imageUrl: `https://picsum.photos/id/${i * 10 + 2}/100/100`
-        }
-      ]
-    });
-  }
-  
-  orderList.value = list;
-  total.value = 100;
-};
+
 
 // 处理状态变化
-const handleStatusChange = () => {
-  queryParams.status = parseInt(activeStatus.value);
-  queryParams.page = 1;
-  fetchOrderList();
+const handleStatusChange = (tabPaneContext) => {
+  // 从 tabPaneContext 中获取新选中的标签的 name 值
+  // 请查阅 Element Plus 关于 el-tabs @tab-click 事件回调参数的文档，
+  // 以确认如何准确获取到 name 值。通常是 tabPaneContext.paneName 或 tabPaneContext.props.name
+  const newStatusString = tabPaneContext.props.name; // 假设是 tabPaneContext.props.name
+                                                  // 如果不对，请尝试 tabPaneContext.paneName
+
+  // 您也可以在这里手动更新 activeStatus.value，虽然 v-model 也会做，但为了确保时序，可以这样做：
+  // if (activeStatus.value !== newStatusString) { // 避免不必要的重复更新（如果v-model已经更新了）
+  //    activeStatus.value = newStatusString;
+  // }
+  // 通常情况下，v-model 会先于 @tab-click 的回调函数更新 activeStatus.value，
+  // 但为了确保万无一失，或者如果 @tab-click 的行为优先于 v-model 的内部更新完成，
+  // 使用事件参数是最可靠的。
+
+  // 直接使用从事件参数中获取的 newStatusString 来更新 queryParams
+  if (newStatusString !== undefined && newStatusString !== null) {
+    queryParams.status = parseInt(newStatusString);
+    queryParams.page = 1; // 切换状态时重置到第一页
+    fetchOrderList();   // 使用最新的 queryParams.status 调用API
+  } else {
+    console.warn('@tab-click 事件未能正确获取到新状态的 name 值', tabPaneContext);
+  }
 };
 
 // 处理页码变化
@@ -493,7 +483,7 @@ const goToComment = (order) => {
 
 // 取消订单
 const cancelOrder = (order) => {
-  cancelDialog.orderId = order.id;
+  cancelDialog.orderId = order.orderNo;
   cancelDialog.form.reason = '';
   cancelDialog.visible = true;
 };
@@ -606,62 +596,29 @@ const confirmRefund = async () => {
 };
 
 // 查看物流
-const showLogistics = (order) => {
-  // 如果订单没有物流信息，先获取一次
-  if (!order.logistics) {
-    getOrderLogistics(order.id).then(res => {
-      logisticsDialog.data = res.data || mockLogisticsData();
-      logisticsDialog.visible = true;
-    }).catch(() => {
-      // 失败时使用模拟数据
-      logisticsDialog.data = mockLogisticsData();
-      logisticsDialog.visible = true;
-    });
-  } else {
-    logisticsDialog.data = order.logistics || mockLogisticsData();
-    logisticsDialog.visible = true;
-  }
-};
+const showLogistics = async (order) => {
+  logisticsDialog.orderIdForLogistics = order.id; // 存储订单ID，用于刷新
+  logisticsDialog.data = { company: '', trackingNo: '', traces: [] }; // 重置/清空旧数据
+  logisticsDialog.loading = true;
+  logisticsDialog.visible = true;
 
-// 模拟物流数据
-const mockLogisticsData = () => {
-  return {
-    company: '顺丰速运',
-    trackingNo: `SF${Math.floor(Math.random() * 10000000000)}`,
-    status: Math.floor(Math.random() * 4) + 1,
-    sendTime: '2023-05-16 10:20:35',
-    location: {
-      province: '浙江省',
-      city: '杭州市',
-      district: '西湖区'
-    },
-    traces: [
-      {
-        time: '2023-05-20 18:30:00',
-        content: '已签收，签收人：本人'
-      },
-      {
-        time: '2023-05-20 11:20:00',
-        content: '【杭州市】快递员正在派送途中'
-      },
-      {
-        time: '2023-05-20 08:30:00',
-        content: '【杭州市】已到达杭州西湖区转运中心'
-      },
-      {
-        time: '2023-05-19 20:15:00',
-        content: '【上海市】已从上海发出，下一站杭州市'
-      },
-      {
-        time: '2023-05-19 18:00:00',
-        content: '【上海市】已到达上海转运中心'
-      },
-      {
-        time: '2023-05-19 15:20:00',
-        content: '【上海市】已揽收'
-      }
-    ]
-  };
+  try {
+    const res = await getOrderLogistics(order.id); // 调用真实API
+    if (res.data && (res.data.traces && res.data.traces.length > 0 || res.data.company)) { // 有物流信息或至少有公司信息
+      logisticsDialog.data = res.data;
+    } else {
+      ElMessage.info('暂无物流信息');
+      logisticsDialog.data.traces = [{ time: new Date().toLocaleString(), content: '暂无物流跟踪信息。'}];
+      logisticsDialog.data.company = res.data?.company || '未知';
+      logisticsDialog.data.trackingNo = res.data?.trackingNo || '未知';
+    }
+  } catch (error) {
+    console.error('获取订单物流失败 (showLogistics):', error);
+    ElMessage.error(error.message || '获取物流信息失败，请重试');
+    logisticsDialog.data.traces = [{ time: new Date().toLocaleString(), content: '物流信息加载失败。'}];
+  } finally {
+    logisticsDialog.loading = false;
+  }
 };
 
 // 申请售后
@@ -725,22 +682,26 @@ const getLogisticsDesc = (status) => {
 
 // 刷新物流信息
 const refreshLogistics = async () => {
+  if (!logisticsDialog.orderIdForLogistics) {
+    ElMessage.warning('无法确定要刷新哪个订单的物流信息');
+    return;
+  }
+  logisticsDialog.loading = true;
   try {
-    // 实际项目中这里应该调用API获取最新物流信息
-    // 这里仅做模拟
-    const newTraces = [
-      {
-        time: new Date().toLocaleString(),
-        content: '物流信息已更新'
-      },
-      ...logisticsDialog.data.traces
-    ];
-    
-    logisticsDialog.data.traces = newTraces;
-    ElMessage.success('物流信息已更新');
+    const res = await getOrderLogistics(logisticsDialog.orderIdForLogistics);
+    if (res.data && (res.data.traces && res.data.traces.length > 0 || res.data.company)) {
+      logisticsDialog.data = res.data;
+      ElMessage.success('物流信息已更新');
+    } else {
+      ElMessage.info('暂无最新物流信息');
+      // 可以选择保留旧的物流信息，或者清空并提示
+      logisticsDialog.data.traces = [{ time: new Date().toLocaleString(), content: '暂无最新物流信息。'}];
+    }
   } catch (error) {
-    console.error('获取物流信息失败:', error);
-    ElMessage.error('获取物流信息失败，请重试');
+    console.error('刷新物流信息失败:', error);
+    ElMessage.error(error.message || '刷新物流信息失败，请重试');
+  } finally {
+    logisticsDialog.loading = false;
   }
 };
 
@@ -766,7 +727,7 @@ onMounted(() => {
     router.push('/login');
     return;
   }
-  
+  queryParams.status = parseInt(activeStatus.value);
   fetchOrderList();
 });
 </script>

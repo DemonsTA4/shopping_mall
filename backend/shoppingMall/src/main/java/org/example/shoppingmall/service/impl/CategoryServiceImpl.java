@@ -73,9 +73,6 @@ public class CategoryServiceImpl implements CategoryService {
         if (categoryDTO.getDescription() != null) {
             category.setDescription(categoryDTO.getDescription());
         }
-        if (categoryDTO.getIcon() != null) {
-            category.setIcon(categoryDTO.getIcon());
-        }
         if (categoryDTO.getSort() != null) {
             category.setSort(categoryDTO.getSort());
         }

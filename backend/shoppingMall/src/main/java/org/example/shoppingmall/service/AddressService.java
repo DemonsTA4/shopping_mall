@@ -8,15 +8,15 @@ public interface AddressService {
 
     AddressDto createAddress(Long userId, AddressDto addressDto);
 
-    AddressDto updateAddress(Long userId, Integer addressId, AddressDto addressDto);
+    AddressDto updateAddress(Long userId, Long addressId, AddressDto addressDto);
 
-    void deleteAddress(Long userId, Integer addressId);
+    void deleteAddress(Long userId, Long addressId);
 
-    AddressDto getAddressById(Long userId, Integer addressId);
+    AddressDto getAddressById(Long userId, Long addressId);
 
     List<AddressDto> getUserAddresses(Long userId);
 
     AddressDto getUserDefaultAddress(Long userId);
 
-    void setDefaultAddress(Long userId, Integer addressId);
+    void setDefaultAddress(Long userId, Long addressId);
 } 

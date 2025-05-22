@@ -24,7 +24,7 @@ public class Address {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id; // 地址ID
+    private Long id; // 地址ID
 
     /**
      * 关联到用户实体

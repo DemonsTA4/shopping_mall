@@ -59,7 +59,7 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     @Transactional
-    public AddressDto updateAddress(Long userId, Integer addressId, AddressDto addressDto) {
+    public AddressDto updateAddress(Long userId, Long addressId, AddressDto addressDto) {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new EntityNotFoundException("地址不存在，ID: " + addressId));
 
@@ -82,7 +82,7 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     @Transactional
-    public void deleteAddress(Long userId, Integer addressId) {
+    public void deleteAddress(Long userId, Long addressId) {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new EntityNotFoundException("地址不存在，ID: " + addressId));
 
@@ -108,7 +108,7 @@ public class AddressServiceImpl implements AddressService {
     }
 
     @Override
-    public AddressDto getAddressById(Long userId, Integer addressId) {
+    public AddressDto getAddressById(Long userId, Long addressId) {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new EntityNotFoundException("地址不存在，ID: " + addressId));
 
@@ -149,7 +149,7 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     @Transactional
-    public void setDefaultAddress(Long userId, Integer addressId) {
+    public void setDefaultAddress(Long userId, Long addressId) {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new EntityNotFoundException("地址不存在，ID: " + addressId));
 

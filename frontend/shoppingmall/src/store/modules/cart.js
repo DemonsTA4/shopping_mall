@@ -299,28 +299,76 @@ export const useCartStore = defineStore('cart', {
 	      }
 	    },
 		
-		async clearCart() {
-		    const userStore = useUserStore();
-		    const originalCartItems = JSON.parse(JSON.stringify(this.cartItems));
+	async clearCart() {
+	    const userStore = useUserStore();
+	    const originalCartItems = JSON.parse(JSON.stringify(this.cartItems));
+	
+	    this.cartItems = []; // 乐观更新
+	    this.saveCart(); // 如果有 saveCart 到 localStorage
+	
+	    if (!userStore.isLogin) return;
+	
+	    try {
+	      const response = await clearCartApiService(); // 调用 API
+	      if (!(response && response.code === 200)) {
+	        this.cartItems = originalCartItems; // API 失败，回滚
+	        this.saveCart();
+	        throw new Error(response?.message || '服务端清空购物车失败');
+	      }
+	    } catch (error) {
+	      this.cartItems = originalCartItems; // 异常，回滚
+	      this.saveCart();
+	      throw error;
+	    }
+	},
+	
+	// ★★★ 在这里添加 removeItemsByIds action ★★★
+	    /**
+	     * 根据提供的ID数组从购物车中移除多个商品项
+	     * @param {Array<string|number>} itemIdsToRemove - 需要移除的购物车项ID的数组
+	     */
+	async removeItemsByIds(itemIdsToRemove) {
+		const userStore = useUserStore(); // 如果需要根据登录状态做不同处理
+	    console.log('[CartStore] removeItemsByIds called with IDs:', itemIdsToRemove);
 		
-		    this.cartItems = []; // 乐观更新
-		    this.saveCart(); // 如果有 saveCart 到 localStorage
-		
-		    if (!userStore.isLogin) return;
-		
-		    try {
-		      const response = await clearCartApiService(); // 调用 API
-		      if (!(response && response.code === 200)) {
-		        this.cartItems = originalCartItems; // API 失败，回滚
-		        this.saveCart();
-		        throw new Error(response?.message || '服务端清空购物车失败');
-		      }
-		    } catch (error) {
-		      this.cartItems = originalCartItems; // 异常，回滚
-		      this.saveCart();
-		      throw error;
+		if (!Array.isArray(itemIdsToRemove)) {
+		    console.error('[CartStore] removeItemsByIds: itemIdsToRemove 必须是一个数组');
+		    return;
 		    }
-		},
+		
+		// 1. 更新前端 Pinia store 中的 cartItems 状态
+		this.cartItems = this.cartItems.filter(item => !itemIdsToRemove.includes(item.id));
+		  
+		// 2. 更新 localStorage
+		this.saveCart(); 
+		
+		      // 3. 可选：与后端同步
+		      //    这取决于您的业务逻辑。订单成功后，这些购物车项在后端可能已经自动清除了，
+		      //    或者后端提供了批量删除购物车项的API。
+		      //    如果您有一个批量删除的API:
+		      //    if (userStore.isLogin) {
+		      //        try {
+		      //            // 假设您有一个名为 batchRemoveCartItems 的API函数
+		      //            // await batchRemoveCartItems(itemIdsToRemove); 
+		      //            console.log('[CartStore] Successfully synced item removals with server.');
+		      //        } catch (error) {
+		      //            console.error('[CartStore] Failed to sync item removals with server:', error);
+		      //            // 这里可能需要错误处理或回滚之前的本地状态修改（如果适用）
+		      //        }
+		      //    }
+		      //    或者，如果您的后端 `removeCartItem` API 一次只能删一个，但您仍希望后端同步：
+		      //    if (userStore.isLogin) {
+		      //        itemIdsToRemove.forEach(async (itemId) => {
+		      //            try {
+		      //                await removeCartItem(itemId); // 循环调用单个删除API
+		      //            } catch (error) {
+		      //                console.error(`[CartStore] Failed to remove item ${itemId} from server:`, error);
+		      //            }
+		      //        });
+		      //    }
+		      //    对于订单成功后清空已购买商品，通常前端本地移除即可，因为这些商品已转化为订单项。
+		      //    是否需要后端同步，取决于您的购物车在后端是如何设计的。
+	},
 
 
     saveCart() {

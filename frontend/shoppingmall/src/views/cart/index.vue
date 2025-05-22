@@ -170,6 +170,7 @@ import { useUserStore } from '@/store/modules/user';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getCartList, updateCartItem, removeCartItem, clearCart, toggleSelectCartItem, selectAllCartItems } from '@/api/cart';
 import { storeToRefs } from 'pinia';
+import { Loading } from '@element-plus/icons-vue';
 
 const router = useRouter();
 const cartStore = useCartStore();
@@ -178,6 +179,7 @@ const { cartItems, isLoading } = storeToRefs(cartStore);
 const allSelected = computed(() =>
   cartItems.value.length > 0 && cartItems.value.every(item => item.selected)
 );
+const loading = ref(false);
 
 // 计算属性：已选择商品总数
 const selectedCount = computed(() => {
@@ -208,6 +210,7 @@ const fetchCartList = async () => {
   loading.value = true;
   
   try {
+	  //loading.value=true;
       await cartStore.fetchCart(); // 调用 store action
       // 数据会自动通过 storeToRefs 更新到组件的 cartItems
       // allSelected 的更新逻辑也应该依赖于 store 的 cartItems
@@ -216,7 +219,7 @@ const fetchCartList = async () => {
       console.error('组件中调用 cartStore.fetchCart 失败:', error);
       ElMessage.error(error.message || '获取购物车列表失败，请重试');
     } finally {
-      // loading.value = false; // 如果 store action 控制 loading，这里也不需要
+      loading.value = false; // 如果 store action 控制 loading，这里也不需要
     }
 };
 

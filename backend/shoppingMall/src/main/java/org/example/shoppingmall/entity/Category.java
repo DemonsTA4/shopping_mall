@@ -26,9 +26,6 @@ public class Category {
     @Column(length = 200)
     private String description;
     
-    @Column(length = 255)
-    private String icon;
-    
     @Column(columnDefinition = "INT DEFAULT 0")
     private Integer sort = 0;
     

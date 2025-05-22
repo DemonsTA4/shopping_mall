@@ -47,15 +47,15 @@
         <h2 class="section-title">收货信息</h2>
         <div class="info-item">
           <span class="label">收货人：</span>
-          <span class="value">{{ order.address?.name }}</span>
+          <span class="value">{{ order.receiverName }}</span>
         </div>
         <div class="info-item">
           <span class="label">联系电话：</span>
-          <span class="value">{{ order.address?.phone }}</span>
+          <span class="value">{{ order.receiverPhone }}</span>
         </div>
         <div class="info-item">
           <span class="label">收货地址：</span>
-          <span class="value">{{ formatAddress(order.address) }}</span>
+          <span class="value">{{ formatAddress(order.shippingAddress) }}</span>
         </div>
       </div>
       
@@ -72,7 +72,7 @@
         </div>
         <div class="info-item">
           <span class="label">支付方式：</span>
-          <span class="value">{{ getPaymentMethodText(order.paymentMethod) }}</span>
+          <span class="value">{{ getPaymentMethodText(order.payType) }}</span>
         </div>
         <div class="info-item" v-if="order.payTime">
           <span class="label">支付时间：</span>
@@ -100,23 +100,23 @@
               v-for="item in order.items" 
               :key="item.id" 
               class="product-item"
+			  @click="goToProductDetail(item.productId)"
             >
               <div class="col product-col">
                 <div class="product-info">
                   <el-image 
-                    :src="item.imageUrl" 
-                    :alt="item.name"
+                    :src="item.productImage" 
+                    :alt="item.productName"
                     class="product-image"
-                    @click="goToProduct(item.productId)"
                   />
                   <div class="product-name" @click="goToProduct(item.productId)">
-                    {{ item.name }}
+                    {{ item.productName }}
                   </div>
                 </div>
               </div>
-              <div class="col price-col">¥{{ item.price }}</div>
+              <div class="col price-col">¥{{ item.productPrice }}</div>
               <div class="col quantity-col">{{ item.quantity }}</div>
-              <div class="col subtotal-col">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
+              <div class="col subtotal-col">¥{{ item.totalPrice }}</div>
             </div>
           </div>
         </div>
@@ -126,15 +126,15 @@
       <div class="amount-section">
         <div class="amount-item">
           <span class="label">商品总价：</span>
-          <span class="value">¥{{ order.totalPrice }}</span>
+          <span class="value">¥{{ order.totalAmount }}</span>
         </div>
         <div class="amount-item">
           <span class="label">运费：</span>
-          <span class="value">¥{{ order.shippingFee }}</span>
+          <span class="value">¥{{ order.freightAmount }}</span>
         </div>
         <div class="amount-item total">
           <span class="label">实付款：</span>
-          <span class="value">¥{{ order.totalAmount }}</span>
+          <span class="value">¥{{ order.payAmount }}</span>
         </div>
       </div>
       
@@ -206,7 +206,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getOrderDetail, cancelOrder as cancelOrderApi, confirmReceipt as confirmReceiptApi } from '@/api/order';
+import { getOrderDetailByIdApi, cancelOrder as cancelOrderApi, confirmReceipt as confirmReceiptApi } from '@/api/order';
 
 const route = useRoute();
 const router = useRouter();
@@ -215,122 +215,30 @@ const order = ref({});
 
 // 获取订单详情
 const fetchOrderDetail = async () => {
-  const orderId = route.params.id;
-  if (!orderId) {
-    ElMessage.error('订单ID不能为空');
-    router.push('/order/list');
-    return;
-  }
-  
-  loading.value = true;
-  
-  try {
-    const res = await getOrderDetail(orderId);
-    order.value = res.data || {};
-  } catch (error) {
-    console.error('获取订单详情失败:', error);
-    ElMessage.error('获取订单详情失败，请重试');
-    
-    // 使用模拟数据
-    mockOrderDetail(orderId);
-  } finally {
-    loading.value = false;
-  }
-};
-
-// 模拟订单详情数据
-const mockOrderDetail = (orderId) => {
-  order.value = {
-    id: orderId,
-    orderNo: `ORDER${Date.now()}`,
-    status: 2,
-    createTime: '2023-05-15 14:30:25',
-    payTime: '2023-05-15 14:35:10',
-    paymentMethod: 'alipay',
-    totalPrice: '1199.00',
-    shippingFee: '0.00',
-    totalAmount: '1199.00',
-    remark: '请尽快发货，谢谢',
-    address: {
-      name: '张三',
-      phone: '13800138000',
-      province: '浙江省',
-      city: '杭州市',
-      district: '西湖区',
-      detail: '古荡街道1号'
-    },
-    items: [
-      {
-        id: 1,
-        productId: 101,
-        name: '测试商品1',
-        price: 599.00,
-        quantity: 1,
-        imageUrl: 'https://picsum.photos/id/1/100/100'
-      },
-      {
-        id: 2,
-        productId: 102,
-        name: '测试商品2',
-        price: 600.00,
-        quantity: 1,
-        imageUrl: 'https://picsum.photos/id/2/100/100'
-      }
-    ]
-  };
-  
-  // 如果订单状态为待收货或待评价，添加物流信息
-  if (order.value.status >= 2) {
-    order.value.logistics = {
-      company: '顺丰速运',
-      trackingNo: `SF${Math.floor(Math.random() * 10000000000)}`,
-      sendTime: '2023-05-16 10:20:35',
-      status: order.value.status >= 4 ? 4 : order.value.status,
-      location: {
-        province: '浙江省',
-        city: '杭州市',
-        district: '西湖区'
-      },
-      traces: [
-        {
-          time: '2023-05-16 10:20:35',
-          content: '【杭州市】快件已由商家发出，等待揽收'
-        },
-        {
-          time: '2023-05-16 15:30:22',
-          content: '【杭州市】快件已被顺丰速运揽收'
-        },
-        {
-          time: '2023-05-16 18:45:10',
-          content: '【杭州市】快件离开杭州中转中心，发往上海中转中心'
-        },
-        {
-          time: '2023-05-17 02:30:45',
-          content: '【上海市】快件到达上海中转中心'
-        },
-        {
-          time: '2023-05-17 08:15:20',
-          content: '【上海市】快件离开上海中转中心，发往上海徐汇区'
-        },
-        {
-          time: '2023-05-17 10:40:10',
-          content: '【上海市】快件到达上海徐汇区，准备派送'
-        },
-        {
-          time: '2023-05-17 13:20:30',
-          content: '【上海市】快递员正在派送途中，请保持电话畅通'
-        }
-      ]
-    };
-    
-    // 如果订单已完成，添加签收信息
-    if (order.value.status >= 4) {
-      order.value.logistics.traces.unshift({
-        time: '2023-05-17 16:30:00',
-        content: '【上海市】快件已签收，签收人：本人，感谢您使用顺丰速运'
-      });
-    }
-  }
+  const numericId = route.params.id; // 从路由获取 :id 参数
+    if (numericId) {
+      loading.value = true;
+      try {
+		const res = await getOrderDetailByIdApi(numericId); // 假设这个 getOrderDetail 是为数字ID设计的
+		order.value = res.data || {};
+		if (Object.keys(order.value).length === 0 && !loading.value) { // 检查API是否返回了空数据
+			ElMessage.error('未找到订单详情或订单为空');
+        // router.push('/order/list'); // 可以选择跳转
+			}
+		} catch (error) {
+			console.error('获取订单详情失败:', error);
+			ElMessage.error('获取订单详情失败，请重试');
+			// mockOrderDetail(orderId); // <--- 移除或注释掉这行
+			// 可以选择跳转到错误页或列表页
+			// router.push('/order/list');
+		} finally {
+			loading.value = false;
+		}
+	}
+	else {
+	    console.error('路由中未找到订单ID');
+	    // ... 错误处理 ...
+	  }
 };
 
 // 获取状态文字
@@ -382,15 +290,16 @@ const getStatusType = (status) => {
 };
 
 // 获取支付方式文字
-const getPaymentMethodText = (method) => {
+const getPaymentMethodText = (payTypeCode) => {
+  if (payTypeCode === null || payTypeCode === undefined) {
+    return '未指定'; // 或者 'N/A', 或者根据业务返回 '-'
+  }
   const methodMap = {
-    'alipay': '支付宝',
-    'wechat': '微信支付',
-    'credit': '信用卡',
-    'cash': '货到付款'
+    1: '支付宝',    // 假设后端 1 代表支付宝
+    2: '微信支付',  // 假设后端 2 代表微信
+    // ... 其他映射
   };
-  
-  return methodMap[method] || '未知支付方式';
+  return methodMap[payTypeCode] || '未知支付方式';
 };
 
 // 格式化地址
@@ -422,7 +331,7 @@ const cancelOrder = async () => {
       }
     );
     
-    await cancelOrderApi(order.value.id, { reason: '用户取消' });
+    await cancelOrderApi(order.value.orderNo, { reason: '用户取消' });
     ElMessage.success('订单已取消');
     fetchOrderDetail();
   } catch (error) {
@@ -446,7 +355,7 @@ const confirmReceipt = async () => {
       }
     );
     
-    await confirmReceiptApi(order.value.id);
+    await confirmReceiptApi(order.value.orderNo,{reason: '用户取消'});
     ElMessage.success('确认收货成功');
     fetchOrderDetail();
   } catch (error) {

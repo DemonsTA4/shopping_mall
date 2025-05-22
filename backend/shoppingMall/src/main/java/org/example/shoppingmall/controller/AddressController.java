@@ -51,7 +51,7 @@ public class AddressController {
                                              @PathVariable Long id) { // 路径变量是 Long
         Long currentUserId = getUserIdFromPrincipal(currentUser);
         // 调用 Service 时，将 Long id 转换为 Integer
-        AddressDto address = addressService.getAddressById(currentUserId, id.intValue()); // ★★★ 类型转换 ★★★
+        AddressDto address = addressService.getAddressById(currentUserId, id); // ★★★ 类型转换 ★★★
         return Result.success(address);
     }
 
@@ -61,7 +61,7 @@ public class AddressController {
                                             @RequestBody @Valid AddressDto addressDTO) {
         Long currentUserId = getUserIdFromPrincipal(currentUser);
         // 调用 Service 时，将 Long id 转换为 Integer
-        AddressDto updatedAddress = addressService.updateAddress(currentUserId, id.intValue(), addressDTO); // ★★★ 类型转换 ★★★
+        AddressDto updatedAddress = addressService.updateAddress(currentUserId, id, addressDTO); // ★★★ 类型转换 ★★★
         return Result.success(updatedAddress);
     }
 
@@ -70,7 +70,7 @@ public class AddressController {
                                       @PathVariable Long id) { // 路径变量是 Long
         Long currentUserId = getUserIdFromPrincipal(currentUser);
         // 调用 Service 时，将 Long id 转换为 Integer
-        addressService.deleteAddress(currentUserId, id.intValue()); // ★★★ 类型转换 ★★★
+        addressService.deleteAddress(currentUserId, id); // ★★★ 类型转换 ★★★
         return Result.success();
     }
 
@@ -79,7 +79,7 @@ public class AddressController {
                                           @PathVariable Long id) { // 路径变量是 Long
         Long currentUserId = getUserIdFromPrincipal(currentUser);
         // 调用 Service 时，将 Long id 转换为 Integer
-        addressService.setDefaultAddress(currentUserId, id.intValue()); // ★★★ 类型转换 ★★★
+        addressService.setDefaultAddress(currentUserId, id); // ★★★ 类型转换 ★★★
         return Result.success();
     }
 }

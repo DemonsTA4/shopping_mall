@@ -19,8 +19,6 @@ public class CategoryDTO {
     @Size(max = 200, message = "分类描述长度不能超过200个字符")
     private String description;
 
-    private String icon;
-
     private Integer sort = 0;
 
     private Integer status = 1; // 默认启用

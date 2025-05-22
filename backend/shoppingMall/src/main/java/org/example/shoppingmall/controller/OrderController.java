@@ -5,6 +5,9 @@ import org.example.shoppingmall.common.Result;
 import org.example.shoppingmall.dto.OrderCreateRequestDto;
 import org.example.shoppingmall.dto.OrderItemResponseDto;
 import org.example.shoppingmall.dto.OrderResponseDto;
+import org.example.shoppingmall.dto.OrderPaymentRequestDto;
+import org.example.shoppingmall.dto.PaymentInitiationResponseDto;
+import org.example.shoppingmall.dto.PaymentStatusDto;
 // Order entity is not directly used if service returns DTOs
 // import org.example.shoppingmall.entity.Order;
 import org.example.shoppingmall.entity.OrderItem; // Used for temporary list creation
@@ -37,7 +40,8 @@ public class OrderController {
     private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
 
     @Autowired
-    public OrderController(OrderService orderService, ProductService productService, UserService userService) {
+    // 构造函数也可能需要调整，如果 ProductService 不再需要在这里注入
+    public OrderController(OrderService orderService , ProductService productService, UserService userService ) {
         this.orderService = orderService;
         this.productService = productService;
         this.userService = userService;
@@ -45,80 +49,90 @@ public class OrderController {
 
     @PostMapping
     public Result<OrderResponseDto> createOrder(@Valid @RequestBody OrderCreateRequestDto orderRequest) {
+        logger.info("进入 OrderController.createOrder 方法");
+        logger.info("接收到的 OrderCreateRequestDto 对象: {}", orderRequest); // Lombok @Data 会生成 toString()
+        logger.info("DTO 中的 shippingAddress 值: {}", orderRequest.getShippingAddress());
+        logger.info("DTO 中的 items 是否为空: {}", orderRequest.getItems() == null ? "是" : "否，数量: " + orderRequest.getItems().size());
+        logger.info("DTO 中的 notes 值: {}", orderRequest.getNotes());
+        logger.info("DTO 中的 paymentMethod 值: {}", orderRequest.getPaymentMethod());
+        if (orderRequest.getShippingAddress() == null) {
+            logger.error("严重错误：shippingAddress 在 OrderCreateRequestDto 中为 null！");
+            // 这里可以根据情况决定是否提前返回错误，或者让后续的 @NotBlank 生效
+        }
         Long currentUserId = getCurrentUserId();
         // User currentUser = userService.getUserById(currentUserId); // Not strictly needed if OrderResponseDto from service is complete
 
-        // The temporaryOrderItems list is built here and passed to the service.
-        // The service layer is responsible for creating persistent OrderItem entities.
-        // This assumes OrderCreateRequestDto.ItemDto has getProductId(), getQuantity(), getProductSpecs().
-        // And ProductService.getProductEntityById() returns a Product entity.
-        List<OrderItem> temporaryOrderItems = orderRequest.getItems().stream()
-                .map(itemDto -> {
-                    OrderItem orderItem = new OrderItem();
-                    // It's generally better if ProductService returns a Product DTO浅
-                    // or if OrderService takes Product IDs and handles fetching.
-                    // For now, assuming getProductEntityById returns the Product entity.
-                    orderItem.setProduct(productService.getProductEntityById(itemDto.getProductId()));
-                    orderItem.setQuantity(itemDto.getQuantity());
-                    orderItem.setProductSpecs(itemDto.getProductSpecs());
-                    // Price and subtotal should be calculated and set in the service layer
-                    // based on the actual product price at the time of order creation.
-                    return orderItem;
-                })
-                .collect(Collectors.toList());
-
-        // OrderService.createOrder is expected to return a fully populated OrderResponseDto
-        OrderResponseDto responseDto = orderService.createOrder(currentUserId, temporaryOrderItems, orderRequest.getShippingAddress());
-
-        // If the responseDto from service doesn't include username, and it's needed:
-        // if (responseDto != null && responseDto.getUsername() == null) {
-        //    User currentUser = userService.getUserById(currentUserId);
-        //    responseDto.setUsername(currentUser.getUsername());
-        // }
-
+        OrderResponseDto responseDto = orderService.createOrder(currentUserId, orderRequest);
         return Result.success(responseDto);
     }
 
     @GetMapping
     public Result<Page<OrderResponseDto>> getUserOrders(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page, // 1. 修改默认值为 "1"，更符合前端习惯
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sort, // Ensure Order entity has 'createdAt' field for sorting
-            @RequestParam(defaultValue = "desc") String direction) {
+            @RequestParam(defaultValue = "createdAt") String sortProperty, // 改个更明确的名字
+            @RequestParam(defaultValue = "desc") String sortDirectionString,
+            @RequestParam(required = false) Integer status) {
 
         Long currentUserId = getCurrentUserId();
+        logger.info("Controller: getUserOrders - userId: {}, pageFromFrontend: {}, size: {}, status: {}, sort: {}, direction: {}",
+                currentUserId, page, size, status, sortProperty, sortDirectionString);
 
-        Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ?
+
+        Sort.Direction direction = sortDirectionString.equalsIgnoreCase("asc") ?
                 Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort sortInfo = Sort.by(direction, sortProperty);
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+        // 2. 将前端1-based的页码转换为后端0-based的页码
+        int pageForJpa = page > 0 ? page - 1 : 0; // 确保 page 大于 0 才减 1，否则从0开始
 
-        // OrderService.getUserOrders is expected to return Page<OrderResponseDto>
-        Page<OrderResponseDto> responsePage = orderService.getUserOrders(currentUserId, pageable);
+        Pageable pageable = PageRequest.of(pageForJpa, size, sortInfo);
+        logger.info("Controller: Calling orderService.getUserOrders with pageable: pageNumber={}, pageSize={}, sort={}",
+                pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort().toString());
+
+
+        Page<OrderResponseDto> responsePage = orderService.getUserOrders(currentUserId, status, pageable);
+
+        logger.info("Controller: Service returned responsePage - totalElements: {}, totalPages: {}, currentPage(0-indexed): {}, numberOfElements: {}",
+                responsePage.getTotalElements(), responsePage.getTotalPages(), responsePage.getNumber(), responsePage.getNumberOfElements());
+        if (responsePage.hasContent() && !responsePage.getContent().isEmpty()) { // 添加 !responsePage.getContent().isEmpty() 检查
+            logger.info("Controller: First order in response content - OrderNo: {}, CreateTime: {}",
+                    responsePage.getContent().get(0).getOrderNo(), responsePage.getContent().get(0).getCreateTime());
+        } else {
+            logger.info("Controller: Service returned no content for this page.");
+        }
 
         return Result.success(responsePage);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/id/{id}")
     public Result<OrderResponseDto> getOrderById(@PathVariable Long id) {
         Long currentUserId = getCurrentUserId();
-        // OrderService.getOrderDetails is expected to return OrderResponseDto
-        OrderResponseDto dto = orderService.getOrderDetails(id);
-
-        if (dto == null) { // Service might throw EntityNotFoundException, or return null
+        OrderResponseDto dto = orderService.getOrderDetails(id); // 假设Service有此方法
+        if (dto == null) {
             return Result.notFound("订单不存在");
         }
-
-        // Validate that the current user is the owner of the order
         if (!dto.getUserId().equals(currentUserId)) {
             return Result.forbidden("无权访问此订单");
         }
+        return Result.success(dto);
+    }
 
+    @GetMapping("/{orderNo}")
+    public Result<OrderResponseDto> getOrderByOrderNo(@PathVariable String orderNo) {
+        Long currentUserId = getCurrentUserId();
+        OrderResponseDto dto = orderService.getOrderDetailsByOrderNo(orderNo, currentUserId); // 假设Service有此方法
+        if (dto == null) {
+            return Result.notFound("订单不存在 (订单号: " + orderNo + ")");
+        }
+        if (dto.getUserId() == null || !dto.getUserId().equals(currentUserId)) {
+            return Result.forbidden("无权访问此订单");
+        }
         return Result.success(dto);
     }
 
     @PostMapping("/{id}/cancel")
-    public Result<OrderResponseDto> cancelOrder(@PathVariable Long id) {
+    public Result<OrderResponseDto> cancelOrder(@PathVariable String id) {
         Long currentUserId = getCurrentUserId();
         // OrderService.cancelOrder is expected to handle validation and return OrderResponseDto
         OrderResponseDto cancelledOrderDto = orderService.cancelOrder(id, currentUserId);
@@ -127,7 +141,7 @@ public class OrderController {
 
     @PutMapping("/{id}/status")
     public Result<OrderResponseDto> updateOrderStatus(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestParam("status") OrderStatus status) { // Spring can convert string to Enum automatically
         // Long currentUserId = getCurrentUserId(); // Uncomment if service needs userId for auth
 
@@ -138,6 +152,28 @@ public class OrderController {
         OrderResponseDto updatedOrderDto = orderService.updateOrderStatus(id, status);
 
         return Result.success(updatedOrderDto);
+    }
+
+    /**
+     * 处理订单支付请求
+     * @param id 订单的数字主键ID (从路径中获取)
+     * @param paymentRequest 包含支付方式等信息的请求体
+     * @return 包含支付二维码URL等信息的响应
+     */
+    @PostMapping("/{id}/pay") // <--- 匹配前端的 POST /api/orders/{id}/pay 请求
+    public Result<PaymentInitiationResponseDto> initiatePayment(
+            @PathVariable Long id,
+            @RequestBody OrderPaymentRequestDto paymentRequest) { // <--- 从请求体获取支付方式
+
+        Long currentUserId = getCurrentUserId(); // 获取当前用户ID，用于权限验证或记录
+
+        // 调用Service层处理支付初始化逻辑
+        // paymentMethod 从 paymentRequest.getPaymentMethod() 获取
+        PaymentInitiationResponseDto paymentResponse = orderService.initiatePayment(id, currentUserId, paymentRequest.getPaymentMethod());
+        // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        // 您需要在 OrderService 中创建 initiatePayment 方法
+
+        return Result.success(paymentResponse);
     }
 
     // Helper method to get current user ID

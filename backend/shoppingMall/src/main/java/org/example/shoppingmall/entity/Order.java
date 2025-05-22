@@ -82,6 +82,9 @@ public class Order {
     @Column(name = "shipping_address_text", length = 700)
     private String shippingAddressText;
 
+    @Column(name = "shipping_address", nullable = false, length = 700) // 根据需要调整长度, nullable = false 需与数据库一致
+    private String shippingAddress;
+
     @Lob
     @Column(name = "note")
     private String note;

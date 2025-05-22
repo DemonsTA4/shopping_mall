@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AddressRepository extends JpaRepository<Address, Integer> {
+public interface AddressRepository extends JpaRepository<Address, Long> {
 
     List<Address> findByUserId(Long userId);
 
@@ -23,11 +23,11 @@ public interface AddressRepository extends JpaRepository<Address, Integer> {
 
     @Modifying
     @Query("UPDATE Address a SET a.isDefault = false WHERE a.user.id = :userId AND a.id <> :addressId")
-    void unsetDefaultAddressesExcept(Long userId, Integer addressId);
+    void unsetDefaultAddressesExcept(Long userId, Long addressId);
 
     @Modifying
     @Query("UPDATE Address a SET a.isDefault = true WHERE a.id = :addressId")
-    void setDefaultAddress(Integer addressId);
+    void setDefaultAddress(Long addressId);
 
     long countByUserId(Long userId);
 }

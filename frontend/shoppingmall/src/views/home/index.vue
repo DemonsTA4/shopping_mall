@@ -36,8 +36,26 @@
 
         <!-- 分类导航 -->
         <div class="category-container">
-          <div class="category-item" v-for="item in categories" :key="item.id" @click="goToCategory(item.id)">
-            <el-icon size="24"><component :is="item.icon" /></el-icon>
+          <div 
+            class="category-item" 
+            v-for="item in categories" 
+            :key="item.id" 
+            @click="goToCategory(item.id)"
+          >
+            <el-image 
+              :src="getCategoryIcon(item.name)"
+              :alt="item.name" 
+              fit="contain" 
+              class="category-icon-img" >
+              <template #error> <div class="image-slot-icon">
+                  <el-icon><Picture /></el-icon>
+                </div>
+              </template>
+              <template #placeholder> <div class="image-slot-icon">
+                  <el-icon><Loading /></el-icon>
+                </div>
+              </template>
+            </el-image>
             <span>{{ item.name }}</span>
           </div>
         </div>
@@ -75,126 +93,114 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { getBanners, getRecommendProducts, getCategories } from '@/api/product';
+// 只导入 getRecommendProducts，因为 banners 和 categories 已经是本地数据了
+import { getRecommendProducts } from '@/api/product';
+
+// 导入分类图标
+import foodIcon from '@/assets/images/food.png';
+import computerIcon from '@/assets/images/computer.png';
+import clothingIcon from '@/assets/images/clothing.png';
+import earphoneIcon from '@/assets/images/earphone.png'; // 电子产品
+import phoneIcon from '@/assets/images/phone.png';
+import defaultCategoryIcon from '@/assets/images/default-category.png';
+
+// 导入本地轮播图图片 (请确保这些文件名在您的 /assets/images/ 文件夹中是正确的)
+import bannerImage1 from '@/assets/images/one.png'; // 示例文件名，请替换
+import bannerImage2 from '@/assets/images/two.png';   // 示例文件名，请替换
+import bannerImage3 from '@/assets/images/three.png';// 示例文件名，请替换
+// 如果有更多轮播图图片，请在这里继续导入
 
 const router = useRouter();
-const banners = ref([]);
 const recommendProducts = ref([]);
-const categories = ref([]);
-const loading = ref(false);
+const loading = ref(false); // 用于 el-skeleton 的加载状态
 
-// 获取数据
+// 本地定义的轮播图数据
+const banners = ref([
+  { id: 'banner_1', imageUrl: bannerImage1, title: '风景一' }, // id 可以自定义, title 用于 alt 属性
+  { id: 'banner_2', imageUrl: bannerImage2, title: '动漫图' },
+  { id: 'banner_3', imageUrl: bannerImage3, title: '森林景' },
+]);
+
+// 本地定义的分类导航数据
+const categories = ref([
+  { id: 'cat_electronics', name: '电子产品' }, // id 保持唯一
+  { id: 'cat_clothing', name: '服装' },
+  { id: 'cat_food', name: '食品' },
+  { id: 'cat_phone', name: '手机' },
+  { id: 'cat_computer', name: '电脑' },
+]);
+
+const categoryIconMap = {
+  '电子产品': earphoneIcon,
+  '服装': clothingIcon,
+  '食品': foodIcon,
+  '手机': phoneIcon,
+  '电脑': computerIcon,
+};
+
+function getCategoryIcon(categoryName) {
+  const iconSrc = categoryIconMap?.[categoryName];
+  return iconSrc || defaultCategoryIcon;
+}
+
+// 获取推荐商品数据的函数 (名称已统一为 fetchData)
 const fetchData = async () => {
   try {
-    loading.value = true;
-    // 同时请求多个接口
-    const [bannersRes, productsRes, categoriesRes] = await Promise.all([
-      getBanners(),
-      getRecommendProducts(),
-      getCategories()
-    ]);
+    loading.value = true; // 开始加载，显示骨架屏
+    const productsRes = await getRecommendProducts();
 
-    // ★★★ 添加日志来检查 productsRes 的结构 ★★★
-    console.log('API调用后的 productsRes:', productsRes); 
+    // console.log('API调用后的 productsRes:', productsRes); // 调试日志
 
-    // 假设您的 `request` 封装返回的是后端最外层 data 字段的内容
-    // 即 productsRes 的结构是 { list: [...], total: N, ... }
     if (productsRes && Array.isArray(productsRes.list)) {
-      console.log('提取到的推荐商品列表 (productsRes.list):', productsRes.list);
+      // console.log('提取到的推荐商品列表 (productsRes.list):', productsRes.list); // 调试日志
       recommendProducts.value = productsRes.list;
-    } 
-    // 另一种常见情况：如果 productsRes 是后端返回的完整JSON { code: ..., message: ..., data: { list: ...}}
-    // 并且您的 request 封装没有自动提取最外层的 data
-    else if (productsRes && productsRes.data && Array.isArray(productsRes.data.list)) {
-      console.log('提取到的推荐商品列表 (productsRes.data.list):', productsRes.data.list);
+    } else if (productsRes && productsRes.data && Array.isArray(productsRes.data.list)) {
+      // console.log('提取到的推荐商品列表 (productsRes.data.list):', productsRes.data.list); // 调试日志
       recommendProducts.value = productsRes.data.list;
-    } 
-    else {
+    } else {
       console.warn('未能从 productsRes 中提取到商品列表，productsRes 的值为:', productsRes);
-      recommendProducts.value = []; // 获取失败或数据格式不对，则设置为空数组
+      recommendProducts.value = [];
     }
-    
-    // 对 bannersRes 和 categoriesRes 也可能需要类似的判断和赋值逻辑
-    // 例如，如果它们也遵循 { list: [...] } 或 { data: { list: [...] } } 结构
-    if (bannersRes && Array.isArray(bannersRes.data)) { // 假设 bannersRes.data 直接是数组
-         banners.value = bannersRes.data;
-    } else if (bannersRes && bannersRes.data && Array.isArray(bannersRes.data.list)) { // 或者 bannersRes.data.list 是数组
-         banners.value = bannersRes.data.list;
-    } else {
-         banners.value = [];
-    }
-
-    if (categoriesRes && Array.isArray(categoriesRes.data)) { // 假设 categoriesRes.data 直接是数组
-         categories.value = categoriesRes.data;
-    } else if (categoriesRes && categoriesRes.data && Array.isArray(categoriesRes.data.list)) { // 或者 categoriesRes.data.list 是数组
-         categories.value = categoriesRes.data.list;
-    } else {
-         categories.value = [];
-    }
-
   } catch (error) {
-    console.error('获取首页数据失败:', error);
+    console.error('获取推荐商品数据失败:', error);
     recommendProducts.value = []; // 出错时也设置为空数组
-    banners.value = [];
-    categories.value = [];
   } finally {
-    loading.value = false;
+    loading.value = false; // 加载完成，隐藏骨架屏
   }
 };
 
-// 商品详情页
-const goToProductDetail = (id) => {
-  router.push(`/product/${id}`);
+// 点击轮播图或商品图跳转到详情页的函数
+const goToProductDetail = (itemId) => {
+  // itemId 可能是轮播图的 id (如 'banner_1') 或商品的 id (通常是数字或不同的字符串格式)
+  console.log('点击项目，ID:', itemId);
+
+  // 根据 itemId 的类型或前缀判断是轮播图还是商品
+  if (typeof itemId === 'string' && itemId.startsWith('banner_')) {
+    // 这是轮播图的点击事件
+    // 您可以根据不同的 banner id 执行不同的操作，例如：
+    // if (itemId === 'banner_1') { router.push('/promo/landscape-special'); }
+    // else if (itemId === 'banner_2') { router.push('/collection/anime-goods'); }
+    // 如果轮播图不用于导航，可以留空或移除这里的逻辑
+    console.log(`轮播图 ${itemId} 被点击。如果需要，请定义具体的跳转逻辑。`);
+  } else if (itemId) { // 假设商品 ID 不是以 'banner_' 开头
+    // 这是商品的点击事件
+    router.push(`/product/${itemId}`);
+  }
 };
 
-// 商品分类页
-const goToCategory = (id) => {
+// 点击分类导航跳转到分类商品列表页
+const goToCategory = (categoryId) => {
   router.push({
     path: '/products',
-    query: { categoryId: id }
+    query: { categoryId: categoryId }
   });
 };
 
-// 模拟数据（当后端接口未准备好时使用）
-const mockData = () => {
-  // 模拟轮播图数据
-  banners.value = [
-    { id: 1, title: '618大促', imageUrl: 'https://img.alicdn.com/imgextra/i4/O1CN019Bd4Uo27zssuRYnZI_!!6000000007866-0-tps-2880-1070.jpg' },
-    { id: 2, title: '新品发布', imageUrl: 'https://img.alicdn.com/imgextra/i4/O1CN01bGzRz324pdpt49rE0_!!6000000007440-0-tps-2880-1070.jpg' },
-    { id: 3, title: '限时优惠', imageUrl: 'https://img.alicdn.com/imgextra/i2/O1CN01VtABSK1CCPdRQiFvp_!!6000000000052-0-tps-2880-1070.jpg' }
-  ];
-  
-  // 模拟分类数据
-  categories.value = [
-    { id: 1, name: '手机数码', icon: 'Iphone' },
-    { id: 2, name: '电脑办公', icon: 'Monitor' },
-    { id: 3, name: '家用电器', icon: 'HomeFilled' },
-    { id: 4, name: '服装鞋包', icon: 'ShoppingBag' },
-    { id: 5, name: '美妆护肤', icon: 'Star' },
-    { id: 6, name: '母婴玩具', icon: 'School' },
-    { id: 7, name: '运动户外', icon: 'Basketball' },
-    { id: 8, name: '家居百货', icon: 'House' }
-  ];
-  
-  // 模拟推荐商品数据
-  recommendProducts.value = Array(8).fill().map((_, index) => ({
-    id: index + 1,
-    name: `商品${index + 1}`,
-    price: Math.floor(Math.random() * 1000 + 100),
-    originalPrice: Math.floor(Math.random() * 1500 + 200),
-    imageUrl: `https://picsum.photos/id/${20 + index}/400/400`,
-    sales: Math.floor(Math.random() * 1000),
-    rate: (Math.random() * 2 + 3).toFixed(1),
-    description: '这是一个很好的商品'
-  }));
-};
-
+// 组件挂载后获取数据
 onMounted(() => {
-  // 尝试从API获取数据，如果失败则使用模拟数据
-  fetchData().catch(() => mockData());
+  fetchData(); // 调用 fetchData 函数获取推荐商品
 });
 </script>
-
 <style lang="scss" scoped>
 .home-container {
   min-height: 100vh;
@@ -285,6 +291,23 @@ onMounted(() => {
         text-decoration: underline;
       }
     }
+  }
+  
+  .category-icon-img {
+    width: 90px;  /* 根据需要调整图标大小 */
+    height: 102px; /* 根据需要调整图标大小 */
+    margin-bottom: 8px; /* 图标和文字之间的间距 */
+    object-fit: contain; /* 确保图片等比缩放并完整显示 */
+  }
+  .image-slot-icon { /* el-image 加载失败或加载中占位符的样式 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    background: #f5f7fa;
+    color: #c0c4cc;
+    font-size: 20px; /* 根据图标大小调整 */
   }
   
   .product-grid {

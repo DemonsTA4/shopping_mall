@@ -17,7 +17,7 @@
         </div>
         
         <div v-else class="address-list">
-          <el-radio-group v-model="selectedAddressId">
+          <el-radio-group v-model="selectedAddressId" @change="onAddressSelectionChange" >
             <div 
               v-for="address in addressList" 
               :key="address.id" 
@@ -234,7 +234,7 @@
       <template #footer>
         <el-button @click="goToOrderList">查看订单</el-button>
         <el-button type="primary" @click="goToPay">
-          去支付 (¥{{ orderTotal }})
+          去支付 (¥{{ successDialog.amountToPay }})
         </el-button>
       </template>
     </el-dialog>
@@ -250,6 +250,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { submitOrder } from '@/api/order';
 import { getAddressList, addAddress, updateAddress, deleteAddress, setDefaultAddress } from '@/api/user';
 import { regionData } from '@/utils/region-data';
+import { formatUtcToLocal } from '@/utils/datetime';
 
 const router = useRouter();
 const cartStore = useCartStore();
@@ -306,7 +307,8 @@ const addressRules = {
 // 提交成功对话框
 const successDialog = reactive({
   visible: false,
-  orderNo: ''
+  orderNo: '',
+  amountToPay: '0.00'
 });
 
 // 计算属性：选中的商品列表
@@ -585,6 +587,16 @@ const handleSubmitOrder = async () => {
         submitting.value = false;
         return;
     }
+	
+	// ...
+	    let paymentMethodCode = 1; // 默认为1 (支付宝)
+	    if (paymentMethod.value === 'alipay') {
+	      paymentMethodCode = 1;
+	    } else if (paymentMethod.value === 'wechat') {
+	      paymentMethodCode = 2;
+	    } else if (paymentMethod.value === 'credit') {
+	      paymentMethodCode = 3;
+	    }
 
     // 3. 构建符合后端 OrderCreateRequestDto 的数据对象
     const data = {
@@ -600,7 +612,7 @@ const handleSubmitOrder = async () => {
       receiverDistrict: selectedFullAddress.district || null,
       receiverPostalCode: selectedFullAddress.zipCode || null,
 
-      paymentMethod: parseInt(paymentMethod.value) || 1, // ★★★ 确保 paymentMethod 是 Integer 类型 (假设后端是Integer)
+      paymentMethod: paymentMethodCode, // ★★★ 确保 paymentMethod 是 Integer 类型 (假设后端是Integer)
                                                           // 如果你的 paymentMethod.value 是字符串如 "alipay", 
                                                           // 而后端 OrderCreateRequestDto 的 paymentMethod 是 Integer (例如 1代表支付宝, 2代表微信)
                                                           // 你需要在这里进行转换。
@@ -613,15 +625,30 @@ const handleSubmitOrder = async () => {
     // 提交订单 (submitOrder 是你封装的 API 调用)
     const res = await submitOrder(data);
 
-    if (res && res.code === 200) { // 假设你的API响应结构包含 code
-      // 清空已结算的商品 (这个逻辑可能需要调整，看 removeSelectedItems 如何工作)
-      // 通常是基于ID列表去清除，或者 store action 本身知道如何清除已选
-      const itemIdsToRemove = selectedItems.value.map(item => item.id);
-      cartStore.removeItemsByIds(itemIdsToRemove); // 假设 cartStore 有这样一个 action
-
-      // 显示成功对话框
-      successDialog.orderNo = res.data.orderNo || `ORDER${Date.now()}`; // 确保 res.data.orderNo 存在
-      successDialog.visible = true;
+    if (res && res.code === 200) { // 假设您的API响应结构包含 code
+        // ★★★ 修改处：直接使用 orderTotal.value ★★★
+        // 假设 orderTotal 是在 <script setup> 中定义的 computed 或 ref
+        const finalOrderTotalForDisplay = orderTotal.value; 
+        // ★★★ 在清空购物车前，保存当时的订单总额 ★★★
+    
+        // ★★★ 修改处：直接使用 selectedItems.value ★★★
+        // 假设 selectedItems 是在 <script setup> 中定义的 computed 或 ref
+        const itemIdsToRemove = selectedItems.value.map(item => item.id); 
+    
+        // ★★★ 修改处：直接使用 cartStore ★★★
+        // 确保 cartStore.removeItemsByIds 函数已在您的 cartStore 中定义
+        // 假设 cartStore 是通过 const cartStore = useCartStore(); 在 <script setup> 中定义的
+        if (typeof cartStore.removeItemsByIds === 'function') { 
+            cartStore.removeItemsByIds(itemIdsToRemove);
+        } else {
+            console.error("cartStore.removeItemsByIds is not a function! Cart items not cleared from frontend state.");
+            // 即使这里报错，订单可能已在后端创建成功，只是前端购物车未清理
+        }
+    
+        // ★★★ 修改处：直接使用 successDialog (假设它是 reactive 对象) ★★★
+        successDialog.orderNo = res.data.orderNo || `ORDER${Date.now()}`;
+        successDialog.amountToPay = finalOrderTotalForDisplay; // ★★★ 将保存的金额赋给对话框的一个新属性 ★★★
+        successDialog.visible = true;
     } else {
       // API 返回了业务错误
       ElMessage.error(res?.message || '提交订单失败，请稍后再试');
@@ -681,6 +708,12 @@ const goToOrderList = () => {
   successDialog.visible = false;
 };
 
+const onAddressSelectionChange = (newlySelectedId) => {
+  console.log('Address selection changed. New selectedAddressId:', newlySelectedId);
+  console.log('Type of newlySelectedId:', typeof newlySelectedId);
+  console.log('Current selectedAddressId.value (after v-model update, might be async):', selectedAddressId.value);
+};
+
 onMounted(() => {
   if (!userStore.isLogin) {
     ElMessage.warning('请先登录');
@@ -699,6 +732,11 @@ onMounted(() => {
   initializeCheckout();
   initializePageData();
 });
+
+watch(selectedAddressId, (newValue, oldValue) => {
+  console.log(`selectedAddressId changed from ${oldValue} to ${newValue}, type: ${typeof newValue}`);
+});
+
 </script>
 
 <style lang="scss" scoped>

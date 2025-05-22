@@ -149,7 +149,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { getOrderDetail } from '@/api/order';
+import { getOrderDetailByIdApi } from '@/api/order';
 import { getUserInfo } from '@/api/user';
 import { submitAftersaleApplication } from '@/api/aftersale';
 import { useUserStore } from '@/store/modules/user';
@@ -261,7 +261,7 @@ const fetchOrderDetail = async () => {
   loading.value = true;
   
   try {
-    const res = await getOrderDetail(orderId);
+    const res = await getOrderDetailByIdApi(orderId);
     order.value = res.data || {};
     
     // 初始化商品选择状态

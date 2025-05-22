@@ -1,11 +1,15 @@
 package org.example.shoppingmall.service.impl;
 
-import org.example.shoppingmall.dto.OrderItemResponseDto;
-import org.example.shoppingmall.dto.OrderResponseDto;
+import jakarta.persistence.EntityNotFoundException;
+import org.example.shoppingmall.controller.OrderController;
+import org.example.shoppingmall.dto.*;
 // 假设 OrderCreateRequestDto 和 OrderItemCreateDto (用于createOrder的items参数) 已定义
 // import org.example.shoppingmall.dto.OrderCreateRequestDto;
 // import org.example.shoppingmall.dto.OrderItemCreateDto;
+import org.example.shoppingmall.dto.OrderItemResponseDto;
+import org.example.shoppingmall.dto.OrderCreateRequestDto;
 import org.example.shoppingmall.entity.*;
+import org.example.shoppingmall.exception.UnauthorizedException;
 import org.example.shoppingmall.repository.OrderRepository;
 import org.example.shoppingmall.repository.ProductRepository;
 import org.example.shoppingmall.repository.UserRepository;
@@ -17,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils; // 用于检查字符串
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,6 +39,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+    private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
+    // ... 您的 @Autowired 依赖注入 ...
     // 考虑注入 CartService 或 CartItemRepository 用于清空购物车等操作
 
     @Autowired
@@ -45,76 +53,88 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public OrderResponseDto createOrder(Long userId, List<OrderItem> temporaryOrderItems, String shippingAddressFullText) {
+    public OrderResponseDto createOrder(Long userId, OrderCreateRequestDto orderRequestDto) { // 接收 DTO
+        logger.info("Service层接收到的 OrderCreateRequestDto: {}", orderRequestDto); // 确认DTO已传入
         User buyer = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("用户不存在 (ID: " + userId + ")"));
 
-        if (CollectionUtils.isEmpty(temporaryOrderItems)) {
+        if (CollectionUtils.isEmpty(orderRequestDto.getItems())) { // 从DTO获取items
             throw new RuntimeException("订单项不能为空");
+        }
+        if (!StringUtils.hasText(orderRequestDto.getShippingAddress())) { // 从DTO获取shippingAddress
+            throw new RuntimeException("收货地址不能为空 (来自Service校验)");
         }
 
         Order newOrder = new Order();
         newOrder.setBuyer(buyer);
         newOrder.setOrderNo(generateOrderNo());
         newOrder.setStatus(OrderStatus.PENDING_PAYMENT);
-        newOrder.setShippingAddressText(shippingAddressFullText); // 保存原始完整地址
 
-        // 实际应用中，结构化的收货地址信息应作为参数传入或从用户默认地址获取
-        // 这里做简化处理，假设 shippingAddressFullText 包含了一些关键信息
-        // 或者您可以在Controller层解析好再传入
-        if (StringUtils.hasText(shippingAddressFullText)) {
-            newOrder.setReceiverAddress(shippingAddressFullText); // 简化，实际应拆分
-            // newOrder.setReceiverName(buyer.getNickname() != null ? buyer.getNickname() : buyer.getUsername()); // 示例
-            // newOrder.setReceiverPhone(buyer.getPhone()); // 示例
-        } else {
-            throw new RuntimeException("收货地址不能为空");
+        // 从 DTO 设置所有相关字段
+        newOrder.setShippingAddress(orderRequestDto.getShippingAddress());
+        newOrder.setShippingAddressText(orderRequestDto.getShippingAddress()); // 如果也需要
+        newOrder.setReceiverAddress(orderRequestDto.getShippingAddress());   // 如果也需要，或从DTO其他字段获取
+
+        newOrder.setReceiverName(orderRequestDto.getReceiverName());
+        newOrder.setReceiverPhone(orderRequestDto.getReceiverPhone());
+        newOrder.setReceiverProvince(orderRequestDto.getReceiverProvince());
+        newOrder.setReceiverCity(orderRequestDto.getReceiverCity());
+        newOrder.setReceiverDistrict(orderRequestDto.getReceiverDistrict());
+        newOrder.setReceiverPostalCode(orderRequestDto.getReceiverPostalCode()); // 这个在DTO中可以为null
+        newOrder.setNote(orderRequestDto.getNotes());                         // 这个在DTO中可以为null
+        if (orderRequestDto.getPaymentMethod() != null) { // 假设DTO中 paymentMethod 是 Integer
+            newOrder.setPayType(orderRequestDto.getPaymentMethod());
         }
 
-
         BigDecimal totalAmountCalculated = BigDecimal.ZERO;
-        List<OrderItem> persistentOrderItems = new ArrayList<>();
-
-        for (OrderItem tempItemInfo : temporaryOrderItems) {
-            if (tempItemInfo.getProduct() == null || tempItemInfo.getProduct().getId() == null) {
+        for (OrderItemRequestDto itemDto : orderRequestDto.getItems()) {
+            if (itemDto.getProductId() == null) { // 假设 OrderItemRequestDto 中有 getProductId()
                 throw new RuntimeException("订单项中的商品ID缺失");
             }
-            if (tempItemInfo.getQuantity() == null || tempItemInfo.getQuantity() <= 0) {
+            if (itemDto.getQuantity() == null || itemDto.getQuantity() <= 0) { // 假设有 getQuantity()
                 throw new RuntimeException("订单项中的商品数量无效");
             }
 
-            Product product = productRepository.findById(tempItemInfo.getProduct().getId())
-                    .orElseThrow(() -> new RuntimeException("商品不存在 (ID: " + tempItemInfo.getProduct().getId() + ")"));
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("商品不存在 (ID: " + itemDto.getProductId() + ")"));
 
-            if (product.getStock() < tempItemInfo.getQuantity()) { // 使用 product.getStock()
-                throw new RuntimeException("商品 '" + product.getName() + "' 库存不足 (需求: " + tempItemInfo.getQuantity() + ", 现有: " + product.getStock() + ")");
+            if (product.getStock() < itemDto.getQuantity()) {
+                throw new RuntimeException("商品 '" + product.getName() + "' 库存不足 (需求: " + itemDto.getQuantity() + ", 现有: " + product.getStock() + ")");
             }
 
-            product.setStock(product.getStock() - tempItemInfo.getQuantity()); // 使用 product.setStock()
+            product.setStock(product.getStock() - itemDto.getQuantity()); // 使用 product.setStock()
             productRepository.save(product);
 
             OrderItem persistentOrderItem = new OrderItem();
             persistentOrderItem.setProduct(product);
-            persistentOrderItem.setProductName(product.getName());
-            persistentOrderItem.setProductImage(product.getImageUrl());
-            persistentOrderItem.setUnitPrice(product.getPrice());
-            persistentOrderItem.setQuantity(tempItemInfo.getQuantity());
+            persistentOrderItem.setProductName(product.getName()); // 或从 itemDto 获取快照 (如果DTO有)
+            persistentOrderItem.setProductImage(product.getImageUrl()); // 或从 itemDto 获取快照
+            persistentOrderItem.setUnitPrice(product.getPrice()); // 或从 itemDto 获取快照
+            persistentOrderItem.setQuantity(itemDto.getQuantity());
+            persistentOrderItem.setProductSpecs(itemDto.getProductSpecs()); // 从 itemDto 获取
             persistentOrderItem.calculateSubtotal();
 
             totalAmountCalculated = totalAmountCalculated.add(persistentOrderItem.getSubtotal());
-            newOrder.addItem(persistentOrderItem); // addItem 会设置 persistentOrderItem.setOrder(newOrder)
+            newOrder.addItem(persistentOrderItem);
         }
 
         newOrder.setTotalAmount(totalAmountCalculated);
-        // 根据业务设置其他金额，如运费、实际支付金额
-        newOrder.setFreightAmount(calculateFreight(newOrder)); // 假设有运费计算逻辑
-        newOrder.setPayAmount(newOrder.getTotalAmount().add(newOrder.getFreightAmount())); // 示例：支付金额 = 商品总额 + 运费
+        newOrder.setFreightAmount(calculateFreight(newOrder));
+        newOrder.setPayAmount(newOrder.getTotalAmount().add(newOrder.getFreightAmount()));
 
         Order savedOrder = orderRepository.save(newOrder);
-
-        // 此处可以添加逻辑，例如：如果订单来源于购物车，清空购物车中已下单的商品
-        // clearCartItems(userId, temporaryOrderItems);
-
         return convertToOrderResponseDto(savedOrder);
+    }
+
+    @Override
+    public OrderResponseDto getOrderDetailsByOrderNo(String orderNo, Long userId) {
+        Order order = orderRepository.findByOrderNo(orderNo)
+                .orElseThrow(() -> new RuntimeException("订单不存在 (订单号: " + orderNo + ")"));
+        // 权限校验
+        if (order.getBuyer() == null || !order.getBuyer().getId().equals(userId)) {
+            throw new UnauthorizedException("无权访问此订单");
+        }
+        return convertToOrderResponseDto(order);
     }
 
     private String generateOrderNo() {
@@ -139,25 +159,36 @@ public class OrderServiceImpl implements OrderService {
 
 
     @Override
-    public OrderResponseDto getOrderDetails(Long orderId) {
-        Order order = orderRepository.findById(orderId) // findById 已通过 @EntityGraph 加载关联
-                .orElseThrow(() -> new RuntimeException("订单不存在 (ID: " + orderId + ")"));
+    public OrderResponseDto getOrderDetails(Long id) {
+        Order order = orderRepository.findById(id) // findById 已通过 @EntityGraph 加载关联
+                .orElseThrow(() -> new RuntimeException("订单不存在 (ID: " + id + ")"));
         return convertToOrderResponseDto(order);
     }
 
     @Override
-    public Page<OrderResponseDto> getUserOrders(Long userId, Pageable pageable) {
-        // 确保用户存在，如果 userRepository.findById 会抛异常则不需要这一步
-        userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在 (ID: " + userId + ")"));
-
-        Page<Order> ordersPage = orderRepository.findByBuyerIdOrderByCreatedAtDesc(userId, pageable);
-        return ordersPage.map(this::convertToOrderResponseDto);
+    public Page<OrderResponseDto> getUserOrders(Long userId, Integer status, Pageable pageable) {
+        Page<Order> ordersPage;
+        if (status != null && status != 0) { // 假设 status=0 或 null 代表查询全部
+            // 将前端的数字状态转换为后端的 OrderStatus 枚举
+            OrderStatus orderStatusEnum = mapIntegerToOrderStatus(status); // 您需要实现这个映射方法
+            if (orderStatusEnum != null) {
+                // 调用 Repository 中按用户ID、状态和分页查询的方法
+                // 您需要在 OrderRepository 中定义 findByBuyerIdAndStatus 方法
+                ordersPage = orderRepository.findByBuyerIdAndStatus(userId, orderStatusEnum, pageable);
+            } else {
+                // 如果状态无效，则查询该用户的所有订单（或抛出错误）
+                ordersPage = orderRepository.findByBuyerIdOrderByCreatedAtDesc(userId, pageable); // 假设您有这个按用户ID查询所有订单的方法
+            }
+        } else {
+            // 查询该用户的所有订单
+            ordersPage = orderRepository.findByBuyerIdOrderByCreatedAtDesc(userId, pageable);
+        }
+        return ordersPage.map(this::convertToOrderResponseDto); // 假设有 DTO 转换方法
     }
 
     @Override
-    public OrderResponseDto updateOrderStatus(Long orderId, OrderStatus status) {
-        Order order = orderRepository.findById(orderId)
+    public OrderResponseDto updateOrderStatus(String orderId, OrderStatus status) {
+        Order order = orderRepository.findByOrderNo(orderId)
                 .orElseThrow(() -> new RuntimeException("订单不存在 (ID: " + orderId + ")"));
 
         if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.REFUNDED) {
@@ -192,8 +223,8 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public OrderResponseDto cancelOrder(Long orderId, Long userId) {
-        Order order = orderRepository.findByIdAndBuyerId(orderId, userId)
+    public OrderResponseDto cancelOrder(String orderId, Long userId) {
+        Order order = orderRepository.findByOrderNoAndBuyerId(orderId, userId)
                 .orElseThrow(() -> new RuntimeException("订单不存在或无权操作 (OrderID: " + orderId + ")"));
 
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT && order.getStatus() != OrderStatus.AWAITING_SHIPMENT) {
@@ -228,6 +259,13 @@ public class OrderServiceImpl implements OrderService {
         dto.setOrderNo(order.getOrderNo());
 
         User buyer = order.getBuyer();
+
+        if (order.getStatus() != null) {
+            dto.setStatus(order.getStatus().getCode()); // <--- 直接调用枚举的 getCode() 方法
+        } else {
+            dto.setStatus(0); // 或者您定义的代表null或未知状态的数字
+        }
+
         if (buyer != null) {
             dto.setUserId(buyer.getId());
             dto.setUsername(buyer.getUsername());
@@ -237,7 +275,6 @@ public class OrderServiceImpl implements OrderService {
         dto.setPayAmount(order.getPayAmount());
         dto.setFreightAmount(order.getFreightAmount());
         dto.setPayType(order.getPayType());
-        dto.setStatus(order.getStatus());
         dto.setConfirmStatus(order.getConfirmStatus());
 
         dto.setReceiverName(order.getReceiverName());
@@ -293,4 +330,94 @@ public class OrderServiceImpl implements OrderService {
         }
         return dto;
     }
+
+    @Override
+    public PaymentInitiationResponseDto initiatePayment(Long orderId, Long userId, String paymentMethod) {
+        Order order = orderRepository.findByIdAndBuyerId(orderId, userId) // 验证订单存在且属于该用户
+                .orElseThrow(() -> new RuntimeException("订单不存在或无权操作 (ID: " + orderId + ")"));
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new RuntimeException("订单状态不是待付款，无法支付");
+        }
+
+        // --- 这里是调用实际支付网关或生成支付信息的逻辑 ---
+        // 1. 根据 paymentMethod (如 "alipay", "wechat") 选择相应的支付渠道。
+        // 2. 调用支付渠道的API，传递订单信息（如订单号 order.getOrderNo(), 金额 order.getPayAmount() 等）。
+        // 3. 支付渠道API会返回支付凭证，例如支付宝或微信支付的二维码URL。
+        // 4. 更新订单状态（例如，如果需要，可以先更新为“支付处理中”等，但这取决于您的流程）。
+        // 5. 构建 PaymentInitiationResponseDto 并返回。
+
+        // 示例：假设您有一个 PaymentGatewayService
+        // String qrCodeUrl = paymentGatewayService.generatePaymentQrCode(order, paymentMethod);
+
+        // 简化示例，实际应从支付服务获取
+        String qrCodeUrl = "https://example.com/pay/qr?orderNo=" + order.getOrderNo() + "&method=" + paymentMethod;
+        // order.setPayType(mapPaymentMethodToInteger(paymentMethod)); // 如果需要记录支付方式的数字代码
+        // orderRepository.save(order); // 如果有状态或支付方式更新
+
+        PaymentInitiationResponseDto responseDto = new PaymentInitiationResponseDto();
+        responseDto.setQrUrl(qrCodeUrl);
+        responseDto.setOrderNo(order.getOrderNo());
+
+        return responseDto;
+    }
+
+    @Override
+    public PaymentStatusDto getOrderPaymentStatus(Long orderId /*, Long userIdIfNeeded */) {
+        // 1. (可选) 权限校验：检查当前用户是否有权查询此订单的支付状态
+
+        // 2. 查询订单的支付状态
+        //    这可能涉及到查询您自己的 Order 表中的支付状态字段，
+        //    或者调用第三方支付API查询实际支付结果。
+        //    这里是一个非常简化的示例：
+        Order order = orderRepository.findById(orderId)
+                .orElse(null); // 或者抛出异常
+
+        if (order == null) {
+            // 如果您在这里处理订单不存在的情况，Controller那边就可以简化
+            throw new EntityNotFoundException("订单不存在 (ID: " + orderId + ")");
+        }
+
+        // 假设您的 Order 实体有一个直接表示支付是否成功的字段或状态
+        PaymentStatusDto statusDto = new PaymentStatusDto();
+        if (order.getStatus() == OrderStatus.PROCESSING || // 例如：已付款，处理中/等待发货
+                order.getStatus() == OrderStatus.AWAITING_SHIPMENT ||
+                order.getStatus() == OrderStatus.SHIPPED ||
+                order.getStatus() == OrderStatus.DELIVERED ||
+                order.getStatus() == OrderStatus.COMPLETED ||
+                order.getStatus() == OrderStatus.AWAITING_REVIEW ) {
+            statusDto.setStatus("paid"); // 假设这些都算作前端轮询可以停止的“已支付”状态
+        } else if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+            statusDto.setStatus("pending"); // 或 "unpaid"
+        } else if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
+            statusDto.setStatus("failed"); // 或 "cancelled"
+        } else {
+            statusDto.setStatus("unknown"); // 其他未知状态
+        }
+
+        logger.info("订单 {} 的内部状态为: {}, 映射为支付状态: {}", orderId, order.getStatus(), statusDto.getStatus());
+        return statusDto;
+    }
+
+    private OrderStatus mapIntegerToOrderStatus(Integer statusInt) {
+        if (statusInt == null) return null;
+        // 这个映射需要与您前端的定义一致
+        // (0:全部 (已在Service逻辑中处理), 1:待付款, 2:待发货, 3:待收货, 4:待评价, 5:已完成, 6:已取消)
+        switch (statusInt) {
+            case 1: return OrderStatus.PENDING_PAYMENT;
+            case 2: return OrderStatus.AWAITING_SHIPMENT; // 或 PROCESSING
+            case 3: return OrderStatus.SHIPPED; // 或 DELIVERED
+            case 4: // "待评价" 的逻辑可能是在订单完成后，这里需要您根据业务定义
+                // 如果您的 OrderStatus 枚举有 AWAITING_REVIEW
+                // return OrderStatus.AWAITING_REVIEW;
+                // 否则，如果“待评价”是 COMPLETED 状态的一个后续动作，这里可能不直接按状态筛选
+                // 或者您的 COMPLETED 状态就包含了待评价的含义
+                return OrderStatus.COMPLETED; // 示例，需要您确认
+            case 5: return OrderStatus.COMPLETED;
+            case 6: return OrderStatus.CANCELLED;
+            // ... 其他状态映射
+            default: return null; // 或抛出无效状态异常
+        }
+    }
+
 }
